@@ -33,6 +33,7 @@ interface ContractTemplate {
   isActive: boolean;
   fileSize: string;
   description?: string;
+  fileContent?: string; // Store base64 encoded file content
 }
 
 export default function ContractTemplatePage() {
@@ -48,24 +49,25 @@ export default function ContractTemplatePage() {
   useEffect(() => {
     const savedTemplates = localStorage.getItem('contractTemplates');
     if (savedTemplates) {
-      setTemplates(JSON.parse(savedTemplates));
-    } else {
-      // Initialize with default templates if none exist
-      const defaultTemplates: ContractTemplate[] = [
-        {
-          id: "1",
-          name: "Standard Employment Contract",
-          fileName: "standard_contract_v3.docx",
-          uploadedDate: "2024-01-15",
-          uploadedBy: "Leo Kaluza",
-          version: 3,
-          isActive: true,
-          fileSize: "45 KB",
-          description: "Standard employment contract template with all required clauses"
+      try {
+        const parsedTemplates = JSON.parse(savedTemplates);
+        // Check if templates have the new fileContent property
+        const hasFileContent = parsedTemplates.some((t: any) => t.hasOwnProperty('fileContent'));
+        if (!hasFileContent) {
+          // Clear old format and start fresh
+          localStorage.removeItem('contractTemplates');
+          setTemplates([]);
+        } else {
+          setTemplates(parsedTemplates);
         }
-      ];
-      setTemplates(defaultTemplates);
-      localStorage.setItem('contractTemplates', JSON.stringify(defaultTemplates));
+      } catch (error) {
+        // Clear corrupted data
+        localStorage.removeItem('contractTemplates');
+        setTemplates([]);
+      }
+    } else {
+      // Initialize with empty array - user needs to upload templates
+      setTemplates([]);
     }
   }, []);
 
@@ -80,9 +82,21 @@ export default function ContractTemplatePage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      const file = formData.get('file') as File;
+      // Convert file to base64 for storage using FileReader
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]); // Remove data:application/...;base64, prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
       // Simulate API call - in real app, this would upload to server
       await new Promise(resolve => setTimeout(resolve, 2000));
-      return { success: true, id: Date.now().toString() };
+      return { success: true, id: Date.now().toString(), fileContent: base64 };
     },
     onSuccess: (data) => {
       if (uploadFile && templateName) {
@@ -96,7 +110,8 @@ export default function ContractTemplatePage() {
           version: 1,
           isActive: true,
           fileSize: `${Math.round(uploadFile.size / 1024)} KB`,
-          description: templateDescription || undefined
+          description: templateDescription || undefined,
+          fileContent: data.fileContent
         };
 
         // Update templates - set all others to inactive, make new one active
@@ -188,40 +203,150 @@ export default function ContractTemplatePage() {
   };
 
   const handleDownload = (template: ContractTemplate) => {
-    // Simulate download of original Word document
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = template.fileName;
-    link.click();
-    
-    toast({
-      title: "Download started",
-      description: `Downloading ${template.fileName}...`,
-    });
+    try {
+      if (!template.fileContent) {
+        toast({
+          title: "Download failed",
+          description: "Template file content not available.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Convert base64 back to binary and create download
+      const byteCharacters = atob(template.fileContent);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+      });
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = template.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download started",
+        description: `Downloading ${template.fileName}...`,
+      });
+    } catch (error) {
+      toast({
+        title: "Download failed",
+        description: "Failed to download the template file.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDownloadPDF = async (template: ContractTemplate) => {
     try {
+      if (!template.fileContent) {
+        toast({
+          title: "PDF Generation Failed",
+          description: "Template file content not available.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
         title: "Generating PDF",
         description: "Converting Word document to PDF format...",
       });
 
-      // Simulate PDF conversion process
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Convert base64 back to binary
+      const byteCharacters = atob(template.fileContent);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
 
-      // Create PDF download
+      // Import mammoth and pdf-lib
+      const mammoth = await import('mammoth');
+      const PDFLib = await import('pdf-lib');
+
+      // Convert DOCX to HTML using mammoth
+      const result = await mammoth.convertToHtml({ arrayBuffer: byteArray.buffer });
+      const html = result.value;
+
+      // Create PDF using pdf-lib
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const page = pdfDoc.addPage([612, 792]); // Standard letter size
+      const fontSize = 12;
+      
+      // Simple HTML to text conversion (for basic content)
+      const textContent = html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+      
+      // Split text into lines that fit the page
+      const maxWidth = 500;
+      const lines = [];
+      const words = textContent.split(' ');
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const testWidth = testLine.length * (fontSize * 0.6); // Approximate width
+        
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+
+      // Add text to PDF
+      const maxLinesPerPage = 60;
+      const displayLines = lines.slice(0, maxLinesPerPage);
+      
+      for (let i = 0; i < displayLines.length; i++) {
+        page.drawText(displayLines[i], {
+          x: 50,
+          y: 742 - (i * 14),
+          size: fontSize,
+        });
+      }
+
+      // If there's more content, add a note
+      if (lines.length > maxLinesPerPage) {
+        page.drawText('... (content truncated)', {
+          x: 50,
+          y: 742 - (maxLinesPerPage * 14),
+          size: fontSize,
+        });
+      }
+
+      // Generate PDF
+      const pdfBytes = await pdfDoc.save();
+      const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+      
+      // Create download
       const pdfFileName = template.fileName.replace('.docx', '.pdf');
+      const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
-      link.href = '#'; // In real app, this would be the generated PDF blob URL
+      link.href = url;
       link.download = pdfFileName;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
       toast({
         title: "PDF Download Started",
         description: `Downloading ${pdfFileName}...`,
       });
     } catch (error) {
+      console.error('PDF generation error:', error);
       toast({
         title: "PDF Generation Failed",
         description: "Failed to convert the document to PDF. Please try again.",
@@ -263,7 +388,7 @@ export default function ContractTemplatePage() {
       {/* Main Content */}
       <main className="flex-1 p-6 space-y-6">
         {/* Current Active Template */}
-        {activeTemplate && (
+        {activeTemplate ? (
           <Card className="bg-white shadow-md border border-gray-200">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -298,6 +423,24 @@ export default function ContractTemplatePage() {
                     <FileDown className="w-4 h-4 mr-2" />
                     Download PDF
                   </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <AlertCircle className="w-5 h-5 text-amber-600" />
+                <span>No Active Template</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-center p-8 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="text-center">
+                  <FileText className="w-16 h-16 text-amber-600 mx-auto mb-4" />
+                  <h3 className="font-medium text-gray-900 mb-2">Upload your first contract template</h3>
+                  <p className="text-sm text-gray-600">Upload a .docx file below to get started with contract generation.</p>
                 </div>
               </div>
             </CardContent>
