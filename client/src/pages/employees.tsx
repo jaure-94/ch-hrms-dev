@@ -54,7 +54,7 @@ export default function Employees() {
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <PageHeader 
         title="Employee Directory"
         description="Manage your organization's employees"

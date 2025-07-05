@@ -200,7 +200,7 @@ export default function Analytics() {
   };
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       <PageHeader 
         title="Analytics & Audit Logs"
         description="Monitor system activity and user actions"

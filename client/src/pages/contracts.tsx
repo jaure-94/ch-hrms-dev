@@ -93,7 +93,7 @@ export default function Contracts() {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
+    <div className="min-h-screen flex flex-col">
       {/* Header */}
       <PageHeader 
         title="Contract Management"
