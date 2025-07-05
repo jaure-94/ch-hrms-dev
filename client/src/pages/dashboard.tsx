@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, Users, FileText, UserPlus, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PageHeader from "@/components/page-header";
 
 export default function Dashboard() {
   // For demo purposes, using a hardcoded company ID
@@ -72,24 +73,20 @@ export default function Dashboard() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
-            <p className="text-sm text-gray-600">Overview of your HR management system</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">
-              <Building className="w-4 h-4 mr-2" />
-              Export Data
-            </Button>
-            <Button>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Quick Add Employee
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Dashboard"
+        description="Overview of your HR management system"
+        showLogo={true}
+      >
+        <Button variant="outline">
+          <Building className="w-4 h-4 mr-2" />
+          Export Data
+        </Button>
+        <Button>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Quick Add Employee
+        </Button>
+      </PageHeader>
 
       {/* Main Content */}
       <main className="flex-1 p-6">

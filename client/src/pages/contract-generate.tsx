@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import Breadcrumb from "@/components/breadcrumb";
+import PageHeader from "@/components/page-header";
 
 const contractFormSchema = z.object({
   employeeId: z.string().min(1, "Please select an employee"),
@@ -144,12 +145,10 @@ export default function ContractGeneratePage() {
       />
 
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Generate New Contract</h1>
-          <p className="text-sm text-gray-600">Create an employment contract for an existing employee</p>
-        </div>
-      </header>
+      <PageHeader 
+        title="Generate New Contract"
+        description="Create an employment contract for an existing employee"
+      />
 
       {/* Main Content */}
       <main className="flex-1 p-6">

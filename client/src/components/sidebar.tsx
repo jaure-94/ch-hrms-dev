@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Building, Home, Users, UserPlus, FileText, BarChart, User, Settings, ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import chLogoMid from "@assets/ch-logo-mid_1751733209224.png";
+import chLogoPlain from "@assets/ch-logo-plain_1751733209226.png";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -67,12 +69,16 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
       {!isCollapsed && (
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3 mb-4">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Building className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white">
+              <img 
+                src={chLogoPlain} 
+                alt="Compliance Hub UK" 
+                className="w-8 h-8 object-contain"
+              />
             </div>
             <div>
               <h2 className="font-semibold text-gray-900">
-                {selectedCompany?.name || "Select Company"}
+                Compliance Hub UK
               </h2>
               <p className="text-sm text-gray-500">
                 {stats?.totalEmployees || 0} employees
@@ -98,8 +104,12 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
       {/* Collapsed Company Icon */}
       {isCollapsed && (
         <div className="p-4 border-b border-gray-200 flex justify-center">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <Building className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white">
+            <img 
+              src={chLogoPlain} 
+              alt="Compliance Hub UK" 
+              className="w-6 h-6 object-contain"
+            />
           </div>
         </div>
       )}

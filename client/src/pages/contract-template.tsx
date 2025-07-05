@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Breadcrumb from "@/components/breadcrumb";
+import PageHeader from "@/components/page-header";
 
 interface ContractTemplate {
   id: string;
@@ -201,12 +202,10 @@ export default function ContractTemplatePage() {
       />
 
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">Contract Template Management</h1>
-          <p className="text-sm text-gray-600">Upload and manage contract templates for generating employment contracts</p>
-        </div>
-      </header>
+      <PageHeader 
+        title="Contract Template Management"
+        description="Upload and manage contract templates for generating employment contracts"
+      />
 
       {/* Main Content */}
       <main className="flex-1 p-6 space-y-6">
