@@ -1,0 +1,92 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, ArrowRight, Download, Plus } from "lucide-react";
+import OnboardingForm from "@/components/onboarding-form";
+
+export default function Onboarding() {
+  const [currentStep, setCurrentStep] = useState(1);
+  const totalSteps = 4;
+  
+  const steps = [
+    "Personal Info",
+    "Employment Details", 
+    "Contract Info",
+    "Review & Submit"
+  ];
+
+  const progress = (currentStep / totalSteps) * 100;
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">Employee Onboarding</h1>
+            <p className="text-sm text-gray-600">Add new employees to your organization</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export Data
+            </Button>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Quick Add Employee
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-medium text-gray-900">
+                Step {currentStep} of {totalSteps}
+              </span>
+              <span className="text-sm text-gray-500">
+                {Math.round(progress)}% Complete
+              </span>
+            </div>
+            <Progress value={progress} className="h-2" />
+            <div className="flex justify-between mt-2">
+              {steps.map((step, index) => (
+                <span
+                  key={step}
+                  className={`text-xs ${
+                    index + 1 <= currentStep
+                      ? index + 1 === currentStep 
+                        ? "text-blue-600 font-medium"
+                        : "text-gray-900"
+                      : "text-gray-400"
+                  }`}
+                >
+                  {step}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Form Card */}
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardHeader>
+              <CardTitle className="text-xl">{steps[currentStep - 1]}</CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <OnboardingForm 
+                currentStep={currentStep}
+                onStepChange={setCurrentStep}
+                totalSteps={totalSteps}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
