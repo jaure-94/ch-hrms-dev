@@ -20,7 +20,7 @@ export default function Onboarding() {
   const progress = (currentStep / totalSteps) * 100;
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-full">
       <PageHeader 
         title="Employee Onboarding"
         description="Add new employees to your organization"

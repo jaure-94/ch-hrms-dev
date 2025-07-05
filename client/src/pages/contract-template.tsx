@@ -192,7 +192,7 @@ export default function ContractTemplatePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-full">
       {/* Breadcrumb */}
       <Breadcrumb 
         items={[

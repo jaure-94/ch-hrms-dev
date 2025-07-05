@@ -108,7 +108,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-col h-full">
       <PageHeader 
         title="User Management"
         description="Manage user accounts, roles, and permissions"
