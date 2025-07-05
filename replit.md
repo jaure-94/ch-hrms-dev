@@ -99,3 +99,4 @@ Preferred communication style: Simple, everyday language.
 Changelog:
 - July 05, 2025. Initial setup
 - July 05, 2025. Enhanced UI with sophisticated date picker components, unified page headers, fixed sidebar positioning, and improved navigation flow
+- July 05, 2025. Updated application for UK market: changed currency to pounds sterling, updated locations to UK cities, added comprehensive contract information fields (payment method, marital status, tax code, visa category) to onboarding process with predefined select options

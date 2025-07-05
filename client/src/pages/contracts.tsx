@@ -217,7 +217,7 @@ export default function Contracts() {
                         }
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        ${contract.employee.employment?.baseSalary ? 
+                        £{contract.employee.employment?.baseSalary ? 
                           Number(contract.employee.employment.baseSalary).toLocaleString() : 'N/A'}
                         <span className="text-sm text-gray-500 ml-1">
                           /{contract.employee.employment?.payFrequency?.toLowerCase() || 'year'}

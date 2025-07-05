@@ -14,7 +14,7 @@ export default function Onboarding() {
     "Personal Info",
     "Employment Details", 
     "Contract Info",
-    "Review & Submit"
+    "Manager & Emergency Contact"
   ];
 
   const progress = (currentStep / totalSteps) * 100;

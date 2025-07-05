@@ -14,6 +14,17 @@ import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { DatePicker } from "@/components/ui/date-picker";
+import { 
+  jobTitles, 
+  departments, 
+  employmentStatuses, 
+  payFrequency, 
+  paymentMethods, 
+  maritalStatuses, 
+  taxCodes, 
+  visaCategories, 
+  ukLocations 
+} from "@/lib/constants";
 
 const formSchema = z.object({
   // Personal Information
@@ -37,6 +48,12 @@ const formSchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   location: z.string().min(1, "Location is required"),
   benefits: z.array(z.string()).optional(),
+  
+  // Contract Information
+  paymentMethod: z.string().min(1, "Payment method is required"),
+  maritalStatus: z.string().min(1, "Marital status is required"),
+  taxCode: z.string().min(1, "Tax code is required"),
+  visaCategory: z.string().optional(),
   
   // Company
   companyId: z.string().min(1, "Company is required"),
@@ -76,6 +93,10 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       startDate: "",
       location: "",
       benefits: [],
+      paymentMethod: "",
+      maritalStatus: "",
+      taxCode: "",
+      visaCategory: "",
       companyId: "68f11a7e-27ab-40eb-826e-3ce6d84874de", // In a real app, this would be selected
     },
   });
@@ -134,6 +155,8 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       case 2:
         return ['jobTitle', 'department', 'employmentType', 'baseSalary', 'payFrequency', 'startDate', 'location'];
       case 3:
+        return ['paymentMethod', 'maritalStatus', 'taxCode', 'visaCategory'];
+      case 4:
         return ['manager', 'emergencyContactName', 'emergencyContactPhone'];
       default:
         return [];
@@ -253,11 +276,19 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="jobTitle">Job Title *</Label>
-              <Input
-                id="jobTitle"
-                {...form.register("jobTitle")}
-                placeholder="Senior Software Engineer"
-              />
+              <Select
+                value={form.watch("jobTitle")}
+                onValueChange={(value) => form.setValue("jobTitle", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Job Title" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobTitles.map((title) => (
+                    <SelectItem key={title} value={title}>{title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {form.formState.errors.jobTitle && (
                 <p className="text-sm text-red-600 mt-1">
                   {form.formState.errors.jobTitle.message}
@@ -275,11 +306,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <SelectValue placeholder="Select Department" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Engineering">Engineering</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Human Resources">Human Resources</SelectItem>
-                  <SelectItem value="Finance">Finance</SelectItem>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.department && (
@@ -299,10 +328,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <SelectValue placeholder="Select Employment Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Full-time">Full-time</SelectItem>
-                  <SelectItem value="Part-time">Part-time</SelectItem>
-                  <SelectItem value="Contract">Contract</SelectItem>
-                  <SelectItem value="Internship">Internship</SelectItem>
+                  {employmentStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.employmentType && (
@@ -315,12 +343,12 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             <div>
               <Label htmlFor="baseSalary">Base Salary *</Label>
               <div className="relative">
-                <span className="absolute left-3 top-3 text-gray-500">$</span>
+                <span className="absolute left-3 top-3 text-gray-500">£</span>
                 <Input
                   id="baseSalary"
                   {...form.register("baseSalary")}
                   className="pl-8"
-                  placeholder="85000"
+                  placeholder="45000"
                 />
               </div>
               {form.formState.errors.baseSalary && (
@@ -340,11 +368,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <SelectValue placeholder="Select Pay Frequency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Annual">Annual</SelectItem>
-                  <SelectItem value="Monthly">Monthly</SelectItem>
-                  <SelectItem value="Bi-weekly">Bi-weekly</SelectItem>
-                  <SelectItem value="Weekly">Weekly</SelectItem>
-                  <SelectItem value="Hourly">Hourly</SelectItem>
+                  {payFrequency.map((freq) => (
+                    <SelectItem key={freq} value={freq}>{freq}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.payFrequency && (
@@ -381,9 +407,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <SelectValue placeholder="Select Location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="San Francisco, CA - HQ">San Francisco, CA - HQ</SelectItem>
-                  <SelectItem value="New York, NY">New York, NY</SelectItem>
-                  <SelectItem value="Austin, TX">Austin, TX</SelectItem>
+                  {ukLocations.map((location) => (
+                    <SelectItem key={location} value={location}>{location}</SelectItem>
+                  ))}
                   <SelectItem value="Remote">Remote</SelectItem>
                 </SelectContent>
               </Select>
@@ -423,8 +449,104 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 3: Contract Info */}
+      {/* Step 3: Contract Information */}
       {currentStep === 3 && (
+        <div className="space-y-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
+              Contract Information
+            </h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="paymentMethod">Payment Method *</Label>
+              <Select
+                value={form.watch("paymentMethod")}
+                onValueChange={(value) => form.setValue("paymentMethod", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Payment Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethods.map((method) => (
+                    <SelectItem key={method} value={method}>{method}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.paymentMethod && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.paymentMethod.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="maritalStatus">Marital Status *</Label>
+              <Select
+                value={form.watch("maritalStatus")}
+                onValueChange={(value) => form.setValue("maritalStatus", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Marital Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {maritalStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.maritalStatus && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.maritalStatus.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="taxCode">Tax Code *</Label>
+              <Select
+                value={form.watch("taxCode")}
+                onValueChange={(value) => form.setValue("taxCode", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Tax Code" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taxCodes.map((code) => (
+                    <SelectItem key={code} value={code}>{code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.taxCode && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.taxCode.message}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="visaCategory">Visa Category (if applicable)</Label>
+              <Select
+                value={form.watch("visaCategory")}
+                onValueChange={(value) => form.setValue("visaCategory", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Visa Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visaCategories.map((category) => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 4: Manager & Emergency Contact */}
+      {currentStep === 4 && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
