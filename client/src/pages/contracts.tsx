@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw } from "lucide-react";
+import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw, Settings } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -93,8 +94,8 @@ export default function Contracts() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-6">
+        <div className="space-y-4">
           <div>
             <h1 className="text-2xl font-semibold text-gray-900">Contract Management</h1>
             <p className="text-sm text-gray-600">View and manage all active employment contracts</p>
@@ -104,14 +105,22 @@ export default function Contracts() {
               <Download className="w-4 h-4 mr-2" />
               Export All Contracts
             </Button>
+            <Link href="/contracts/template">
+              <Button variant="outline">
+                <Settings className="w-4 h-4 mr-2" />
+                Set Contract Template
+              </Button>
+            </Link>
             <Button variant="outline">
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh Status
             </Button>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Generate New Contract
-            </Button>
+            <Link href="/contracts/generate">
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Generate New Contract
+              </Button>
+            </Link>
           </div>
         </div>
       </header>

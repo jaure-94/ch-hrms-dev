@@ -9,6 +9,8 @@ import Dashboard from "@/pages/dashboard";
 import Onboarding from "@/pages/onboarding";
 import Employees from "@/pages/employees";
 import Contracts from "@/pages/contracts";
+import ContractTemplate from "@/pages/contract-template";
+import ContractGenerate from "@/pages/contract-generate";
 import Users from "@/pages/users";
 import Analytics from "@/pages/analytics";
 import Sidebar from "@/components/sidebar";
@@ -21,6 +23,8 @@ function Router() {
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/employees" component={Employees} />
       <Route path="/contracts" component={Contracts} />
+      <Route path="/contracts/template" component={ContractTemplate} />
+      <Route path="/contracts/generate" component={ContractGenerate} />
       <Route path="/users" component={Users} />
       <Route path="/analytics" component={Analytics} />
       <Route component={NotFound} />
