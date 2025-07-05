@@ -10,12 +10,12 @@ import EmployeeTable from "@/components/employee-table";
 
 export default function Employees() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   
   // For demo purposes, using a hardcoded company ID
-  const companyId = "demo-company-id";
+  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
   const { data: employees, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'employees', searchQuery],
@@ -23,8 +23,8 @@ export default function Employees() {
   });
 
   const filteredEmployees = employees?.filter((employee: any) => {
-    const matchesDepartment = !departmentFilter || employee.employment?.department === departmentFilter;
-    const matchesStatus = !statusFilter || employee.employment?.status === statusFilter;
+    const matchesDepartment = !departmentFilter || departmentFilter === 'all' || employee.employment?.department === departmentFilter;
+    const matchesStatus = !statusFilter || statusFilter === 'all' || employee.employment?.status === statusFilter;
     return matchesDepartment && matchesStatus;
   }) || [];
 
@@ -96,7 +96,7 @@ export default function Employees() {
                   <SelectValue placeholder="All Departments" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Departments</SelectItem>
+                  <SelectItem value="all">All Departments</SelectItem>
                   <SelectItem value="Engineering">Engineering</SelectItem>
                   <SelectItem value="Marketing">Marketing</SelectItem>
                   <SelectItem value="Sales">Sales</SelectItem>
@@ -108,7 +108,7 @@ export default function Employees() {
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>

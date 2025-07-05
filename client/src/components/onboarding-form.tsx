@@ -75,7 +75,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       startDate: "",
       location: "",
       benefits: [],
-      companyId: "demo-company-id", // In a real app, this would be selected
+      companyId: "68f11a7e-27ab-40eb-826e-3ce6d84874de", // In a real app, this would be selected
     },
   });
 

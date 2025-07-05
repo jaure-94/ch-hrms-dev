@@ -23,7 +23,7 @@ function Router() {
 }
 
 function App() {
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string>(""); // In a real app, this would come from auth/storage
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>("68f11a7e-27ab-40eb-826e-3ce6d84874de"); // In a real app, this would come from auth/storage
 
   return (
     <QueryClientProvider client={queryClient}>

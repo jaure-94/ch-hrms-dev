@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 export default function Dashboard() {
   // For demo purposes, using a hardcoded company ID
   // In a real app, this would come from auth context
-  const companyId = "demo-company-id";
+  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
   const { data: stats, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'stats'],
