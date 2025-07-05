@@ -49,9 +49,24 @@ export const employments = pgTable("employments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const contracts = pgTable("contracts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeeId: uuid("employee_id").references(() => employees.id).notNull(),
+  companyId: uuid("company_id").references(() => companies.id).notNull(),
+  templateId: text("template_id").notNull(),
+  templateName: text("template_name").notNull(),
+  fileName: text("file_name").notNull(),
+  fileContent: text("file_content").notNull(), // Base64 encoded file content
+  status: text("status").default("active"), // active, archived, expired
+  generatedAt: timestamp("generated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const companyRelations = relations(companies, ({ many }) => ({
   employees: many(employees),
   employments: many(employments),
+  contracts: many(contracts),
 }));
 
 export const employeeRelations = relations(employees, ({ one, many }) => ({
@@ -60,6 +75,7 @@ export const employeeRelations = relations(employees, ({ one, many }) => ({
     references: [companies.id],
   }),
   employments: many(employments),
+  contracts: many(contracts),
 }));
 
 export const employmentRelations = relations(employments, ({ one }) => ({
@@ -69,6 +85,17 @@ export const employmentRelations = relations(employments, ({ one }) => ({
   }),
   company: one(companies, {
     fields: [employments.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const contractRelations = relations(contracts, ({ one }) => ({
+  employee: one(employees, {
+    fields: [contracts.employeeId],
+    references: [employees.id],
+  }),
+  company: one(companies, {
+    fields: [contracts.companyId],
     references: [companies.id],
   }),
 }));
@@ -91,14 +118,27 @@ export const insertEmploymentSchema = createInsertSchema(employments).omit({
   updatedAt: true,
 });
 
+export const insertContractSchema = createInsertSchema(contracts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type Company = typeof companies.$inferSelect;
 export type Employee = typeof employees.$inferSelect;
 export type Employment = typeof employments.$inferSelect;
+export type Contract = typeof contracts.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type InsertEmployment = z.infer<typeof insertEmploymentSchema>;
+export type InsertContract = z.infer<typeof insertContractSchema>;
 
 export type EmployeeWithEmployment = Employee & {
   employment: Employment;
+  company: Company;
+};
+
+export type ContractWithDetails = Contract & {
+  employee: Employee;
   company: Company;
 };

@@ -23,13 +23,35 @@ export interface ContractData {
 
 export const downloadContract = async (employeeId: string) => {
   try {
+    // Get the active template from localStorage
+    const savedTemplates = localStorage.getItem('contractTemplates');
+    let activeTemplate = null;
+    
+    if (savedTemplates) {
+      const templates = JSON.parse(savedTemplates);
+      activeTemplate = templates.find((t: any) => t.isActive);
+    }
+
+    if (!activeTemplate || !activeTemplate.fileContent) {
+      throw new Error('No active contract template found. Please upload a template first.');
+    }
+
     const response = await fetch(`/api/employees/${employeeId}/contract`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
       credentials: 'include',
+      body: JSON.stringify({
+        templateId: activeTemplate.id,
+        templateContent: activeTemplate.fileContent,
+        templateName: activeTemplate.name,
+      }),
     });
     
     if (!response.ok) {
-      throw new Error('Failed to generate contract');
+      const errorData = await response.json().catch(() => ({ message: 'Failed to generate contract' }));
+      throw new Error(errorData.message || 'Failed to generate contract');
     }
     
     const blob = await response.blob();

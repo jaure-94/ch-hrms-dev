@@ -1,4 +1,4 @@
-import { companies, employees, employments, type Company, type Employee, type Employment, type InsertCompany, type InsertEmployee, type InsertEmployment, type EmployeeWithEmployment } from "@shared/schema";
+import { companies, employees, employments, contracts, type Company, type Employee, type Employment, type Contract, type InsertCompany, type InsertEmployee, type InsertEmployment, type InsertContract, type EmployeeWithEmployment, type ContractWithDetails } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, like, ilike } from "drizzle-orm";
 
@@ -28,6 +28,14 @@ export interface IStorage {
   // Combined methods
   createEmployeeWithEmployment(employee: InsertEmployee, employment: InsertEmployment): Promise<EmployeeWithEmployment>;
   getEmployeeWithEmployment(employeeId: string): Promise<EmployeeWithEmployment | undefined>;
+
+  // Contract methods
+  getContract(id: string): Promise<Contract | undefined>;
+  getContractsByCompany(companyId: string): Promise<ContractWithDetails[]>;
+  getContractsByEmployee(employeeId: string): Promise<Contract[]>;
+  createContract(contract: InsertContract): Promise<Contract>;
+  updateContract(id: string, contract: Partial<InsertContract>): Promise<Contract>;
+  deleteContract(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -190,6 +198,57 @@ export class DatabaseStorage implements IStorage {
       employment: row.employments!,
       company: row.companies!,
     };
+  }
+
+  // Contract methods
+  async getContract(id: string): Promise<Contract | undefined> {
+    const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
+    return contract || undefined;
+  }
+
+  async getContractsByCompany(companyId: string): Promise<ContractWithDetails[]> {
+    const result = await db
+      .select()
+      .from(contracts)
+      .leftJoin(employees, eq(contracts.employeeId, employees.id))
+      .leftJoin(companies, eq(contracts.companyId, companies.id))
+      .where(eq(contracts.companyId, companyId))
+      .orderBy(desc(contracts.generatedAt));
+
+    return result.map(row => ({
+      ...row.contracts,
+      employee: row.employees!,
+      company: row.companies!,
+    }));
+  }
+
+  async getContractsByEmployee(employeeId: string): Promise<Contract[]> {
+    return await db
+      .select()
+      .from(contracts)
+      .where(eq(contracts.employeeId, employeeId))
+      .orderBy(desc(contracts.generatedAt));
+  }
+
+  async createContract(contract: InsertContract): Promise<Contract> {
+    const [newContract] = await db
+      .insert(contracts)
+      .values(contract)
+      .returning();
+    return newContract;
+  }
+
+  async updateContract(id: string, contract: Partial<InsertContract>): Promise<Contract> {
+    const [updatedContract] = await db
+      .update(contracts)
+      .set(contract)
+      .where(eq(contracts.id, id))
+      .returning();
+    return updatedContract;
+  }
+
+  async deleteContract(id: string): Promise<void> {
+    await db.delete(contracts).where(eq(contracts.id, id));
   }
 }
 

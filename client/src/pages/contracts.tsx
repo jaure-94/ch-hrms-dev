@@ -18,35 +18,39 @@ export default function Contracts() {
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
-  const { data: employees, isLoading } = useQuery({
-    queryKey: ['/api/companies', companyId, 'employees', searchQuery],
+  const { data: contracts, isLoading } = useQuery({
+    queryKey: ['/api/companies', companyId, 'contracts'],
     enabled: !!companyId,
   });
 
-  // Filter active employees to show their contracts
-  const contracts = employees?.filter((employee: any) => {
-    const matchesDepartment = !departmentFilter || departmentFilter === 'all' || employee.employment?.department === departmentFilter;
-    const matchesStatus = !statusFilter || statusFilter === 'all' || employee.employment?.status === statusFilter;
+  // Filter contracts based on search and filters
+  const filteredContracts = contracts?.filter((contract: any) => {
+    const matchesDepartment = !departmentFilter || departmentFilter === 'all' || contract.employee.employment?.department === departmentFilter;
+    const matchesStatus = !statusFilter || statusFilter === 'all' || contract.status === statusFilter;
     const matchesSearch = !searchQuery || 
-      employee.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.employment?.jobTitle.toLowerCase().includes(searchQuery.toLowerCase());
+      contract.employee.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contract.employee.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contract.templateName.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesDepartment && matchesStatus && matchesSearch;
   }) || [];
 
-  const handleDownloadContract = async (employeeId: string) => {
+  const handleDownloadContract = async (contractId: string) => {
     try {
-      const response = await fetch(`/api/employees/${employeeId}/contract`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await fetch(`/api/contracts/${contractId}/download`);
       
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `employment_contract_${employeeId}.docx`;
+        
+        // Get filename from response headers or use default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        const filename = contentDisposition 
+          ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+          : 'contract.docx';
+        
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -127,7 +131,7 @@ export default function Contracts() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="w-5 h-5" />
-              <span>Active Contracts ({contracts.length})</span>
+              <span>Active Contracts ({filteredContracts.length})</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -184,44 +188,44 @@ export default function Contracts() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {contracts.map((contract: any) => (
+                  {filteredContracts.map((contract: any) => (
                     <TableRow key={contract.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="font-medium text-gray-900">
-                          {contract.firstName} {contract.lastName}
+                          {contract.employee.firstName} {contract.employee.lastName}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {contract.email}
+                          {contract.employee.email}
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employment?.jobTitle || 'N/A'}
+                        {contract.employee.employment?.jobTitle || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employment?.department || 'N/A'}
+                        {contract.employee.employment?.department || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employment?.startDate 
-                          ? new Date(contract.employment.startDate).toLocaleDateString()
+                        {contract.employee.employment?.startDate 
+                          ? new Date(contract.employee.employment.startDate).toLocaleDateString()
                           : 'N/A'
                         }
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employment?.startDate 
-                          ? getContractEndDate(contract.employment.startDate)
-                          : 'N/A'
+                        {contract.employee.employment?.endDate 
+                          ? new Date(contract.employee.employment.endDate).toLocaleDateString()
+                          : 'Ongoing'
                         }
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        ${contract.employment?.baseSalary ? 
-                          Number(contract.employment.baseSalary).toLocaleString() : 'N/A'}
+                        ${contract.employee.employment?.baseSalary ? 
+                          Number(contract.employee.employment.baseSalary).toLocaleString() : 'N/A'}
                         <span className="text-sm text-gray-500 ml-1">
-                          /{contract.employment?.payFrequency?.toLowerCase() || 'year'}
+                          /{contract.employee.employment?.payFrequency?.toLowerCase() || 'year'}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(contract.employment?.status || 'inactive')}>
-                          {contract.employment?.status || 'Inactive'}
+                        <Badge className={getStatusColor(contract.status || 'active')}>
+                          {contract.status || 'Active'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -247,7 +251,7 @@ export default function Contracts() {
                 </TableBody>
               </Table>
               
-              {!contracts.length && (
+              {!filteredContracts.length && (
                 <div className="text-center py-8">
                   <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No contracts found</h3>

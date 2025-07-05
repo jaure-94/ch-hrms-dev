@@ -197,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contract generation route
+  // Contract generation route with template support
   app.post("/api/employees/:id/contract", async (req, res) => {
     try {
       const employee = await storage.getEmployeeWithEmployment(req.params.id);
@@ -205,96 +205,164 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Employee not found" });
       }
 
+      // Get the active template from request body or use localStorage approach
+      const { templateId, templateContent, templateName } = req.body;
+      
+      if (!templateContent) {
+        return res.status(400).json({ message: "No active contract template found. Please upload a template first." });
+      }
+
+      // Convert base64 template content back to binary
+      const templateBuffer = Buffer.from(templateContent, 'base64');
+
+      // Import mammoth for DOCX processing
+      const mammoth = await import('mammoth');
+      
+      // Convert DOCX to HTML
+      const result = await mammoth.convertToHtml({ buffer: templateBuffer });
+      let htmlContent = result.value;
+
+      // Create variable mapping from employee data
+      const variables = {
+        // Employee variables
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        fullName: `${employee.firstName} ${employee.lastName}`,
+        email: employee.email,
+        phone: employee.phone || '',
+        address: employee.address || '',
+        dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : '',
+        
+        // Employment variables
+        jobTitle: employee.employment.jobTitle,
+        department: employee.employment.department,
+        manager: employee.employment.manager || 'Management',
+        employmentType: employee.employment.employmentType,
+        baseSalary: employee.employment.baseSalary || '0',
+        payFrequency: employee.employment.payFrequency || '',
+        startDate: employee.employment.startDate ? new Date(employee.employment.startDate).toLocaleDateString() : '',
+        endDate: employee.employment.endDate ? new Date(employee.employment.endDate).toLocaleDateString() : '',
+        location: employee.employment.location || '',
+        status: employee.employment.status || 'active',
+        
+        // Company variables
+        companyName: employee.company.name,
+        companyAddress: employee.company.address || '',
+        companyPhone: employee.company.phone || '',
+        companyEmail: employee.company.email || '',
+        companyWebsite: employee.company.website || '',
+        companyIndustry: employee.company.industry || '',
+        companySize: employee.company.size || '',
+        
+        // Additional formatted variables
+        currentDate: new Date().toLocaleDateString(),
+        currentYear: new Date().getFullYear().toString(),
+      };
+
+      // Replace variables in HTML content using {{variableName}} pattern
+      Object.entries(variables).forEach(([key, value]) => {
+        const patterns = [
+          new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
+          new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
+          new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
+        ];
+        
+        patterns.forEach(pattern => {
+          htmlContent = htmlContent.replace(pattern, value.toString());
+        });
+      });
+
+      // Convert HTML back to DOCX
+      const Document = (await import('docx')).Document;
+      const Packer = (await import('docx')).Packer;
+      const Paragraph = (await import('docx')).Paragraph;
+      const TextRun = (await import('docx')).TextRun;
+
+      // Simple HTML to text conversion for now (for basic templates)
+      const textContent = htmlContent
+        .replace(/<[^>]*>/g, '') // Remove HTML tags
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .trim();
+
+      // Create new document with processed content
       const doc = new Document({
         sections: [
           {
             properties: {},
-            children: [
-              new Paragraph({
-                text: "EMPLOYMENT CONTRACT",
-                heading: HeadingLevel.HEADING_1,
-                alignment: AlignmentType.CENTER,
-              }),
+            children: textContent.split('\n').filter(line => line.trim()).map(line => 
               new Paragraph({
                 children: [
                   new TextRun({
-                    text: `\n\nThis Employment Contract is entered into between ${employee.company.name} (the "Company") and ${employee.firstName} ${employee.lastName} (the "Employee").`,
-                    break: 2,
+                    text: line,
                   }),
                 ],
-              }),
-              new Paragraph({
-                text: "1. POSITION AND DUTIES",
-                heading: HeadingLevel.HEADING_2,
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `The Employee will serve as ${employee.employment.jobTitle} in the ${employee.employment.department} department, reporting to ${employee.employment.manager || "Management"}.`,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                text: "2. COMPENSATION",
-                heading: HeadingLevel.HEADING_2,
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `The Employee will receive a base salary of $${employee.employment.baseSalary} paid ${employee.employment.payFrequency}.`,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                text: "3. START DATE",
-                heading: HeadingLevel.HEADING_2,
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `Employment will commence on ${employee.employment.startDate?.toLocaleDateString()}.`,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                text: "4. LOCATION",
-                heading: HeadingLevel.HEADING_2,
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: `The Employee will work at ${employee.employment.location}.`,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "\n\nCompany: _________________________     Date: _____________",
-                    break: 2,
-                  }),
-                ],
-              }),
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: "\n\nEmployee: _________________________    Date: _____________",
-                    break: 2,
-                  }),
-                ],
-              }),
-            ],
+              })
+            ),
           },
         ],
       });
 
       const buffer = await Packer.toBuffer(doc);
+
+      // Save contract to database
+      const contractData = {
+        employeeId: employee.id,
+        companyId: employee.companyId,
+        templateId: templateId || 'template-1',
+        templateName: templateName || 'Employment Contract Template',
+        fileName: `${employee.firstName}_${employee.lastName}_Contract.docx`,
+        fileContent: buffer.toString('base64'),
+      };
+
+      await storage.createContract(contractData);
       
+      // Send the generated contract file
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${employee.firstName}_${employee.lastName}_Contract.docx"`);
       res.send(buffer);
     } catch (error) {
       res.status(500).json({ message: "Failed to generate contract" });
+    }
+  });
+
+  // Contract routes
+  app.get("/api/companies/:companyId/contracts", async (req, res) => {
+    try {
+      const contracts = await storage.getContractsByCompany(req.params.companyId);
+      res.json(contracts);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contracts" });
+    }
+  });
+
+  app.get("/api/contracts/:id", async (req, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+      res.json(contract);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contract" });
+    }
+  });
+
+  app.get("/api/contracts/:id/download", async (req, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      const buffer = Buffer.from(contract.fileContent, 'base64');
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', `attachment; filename="${contract.fileName}"`);
+      res.send(buffer);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to download contract" });
     }
   });
 
