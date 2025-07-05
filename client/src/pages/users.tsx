@@ -1,0 +1,337 @@
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar, Settings } from "lucide-react";
+
+export default function UsersPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // For demo purposes, using a hardcoded company ID
+  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  
+  const { data: employees, isLoading } = useQuery({
+    queryKey: ['/api/companies', companyId, 'employees', searchQuery],
+    enabled: !!companyId,
+  });
+
+  // Transform employees data to users with role information
+  const users = employees?.map((employee: any) => ({
+    ...employee,
+    role: getUserRole(employee.employment?.department, employee.employment?.jobTitle),
+    accessLevel: getAccessLevel(employee.employment?.department, employee.employment?.jobTitle),
+    lastLogin: generateLastLogin(),
+    accountStatus: employee.employment?.status === 'active' ? 'active' : 'inactive'
+  })).filter((user: any) => {
+    const matchesRole = !roleFilter || roleFilter === 'all' || user.role === roleFilter;
+    const matchesStatus = !statusFilter || statusFilter === 'all' || user.accountStatus === statusFilter;
+    const matchesSearch = !searchQuery || 
+      user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.role.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesRole && matchesStatus && matchesSearch;
+  }) || [];
+
+  function getUserRole(department: string, jobTitle: string) {
+    if (!department || !jobTitle) return 'User';
+    
+    if (department === 'Human Resources') return 'HR Admin';
+    if (jobTitle.toLowerCase().includes('manager') || jobTitle.toLowerCase().includes('director')) return 'Manager';
+    if (jobTitle.toLowerCase().includes('senior')) return 'Senior User';
+    return 'User';
+  }
+
+  function getAccessLevel(department: string, jobTitle: string) {
+    if (!department || !jobTitle) return 'Read';
+    
+    if (department === 'Human Resources') return 'Full Access';
+    if (jobTitle.toLowerCase().includes('manager') || jobTitle.toLowerCase().includes('director')) return 'Manager Access';
+    return 'Standard Access';
+  }
+
+  function generateLastLogin() {
+    // Generate random last login within past 30 days
+    const now = new Date();
+    const randomDays = Math.floor(Math.random() * 30);
+    const lastLogin = new Date(now.getTime() - (randomDays * 24 * 60 * 60 * 1000));
+    return lastLogin.toLocaleDateString();
+  }
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case 'HR Admin':
+        return 'bg-purple-100 text-purple-800';
+      case 'Manager':
+        return 'bg-blue-100 text-blue-800';
+      case 'Senior User':
+        return 'bg-green-100 text-green-800';
+      case 'User':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'inactive':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 p-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
+          <div className="h-96 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900">User Management</h1>
+            <p className="text-sm text-gray-600">Manage user accounts, roles, and permissions</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export User List
+            </Button>
+            <Button variant="outline">
+              <Settings className="w-4 h-4 mr-2" />
+              Bulk Actions
+            </Button>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Add New User
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="flex-1 p-6">
+        <Card className="bg-white shadow-md border border-gray-200">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Users className="w-5 h-5" />
+              <span>System Users ({users.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Search and Filters */}
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                <Input
+                  placeholder="Search users by name, email, or role..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-full md:w-48">
+                  <SelectValue placeholder="All Roles" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="HR Admin">HR Admin</SelectItem>
+                  <SelectItem value="Manager">Manager</SelectItem>
+                  <SelectItem value="Senior User">Senior User</SelectItem>
+                  <SelectItem value="User">User</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full md:w-48">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Users Table */}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Access Level</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Last Login</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user: any) => (
+                    <TableRow key={user.id} className="hover:bg-gray-50">
+                      <TableCell>
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
+                            <Users className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {user.firstName} {user.lastName}
+                            </div>
+                            <div className="text-sm text-gray-500 flex items-center">
+                              <Mail className="w-3 h-3 mr-1" />
+                              {user.email}
+                            </div>
+                            {user.phone && (
+                              <div className="text-sm text-gray-500 flex items-center">
+                                <Phone className="w-3 h-3 mr-1" />
+                                {user.phone}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getRoleColor(user.role)}>
+                          <Shield className="w-3 h-3 mr-1" />
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-gray-900">
+                        {user.accessLevel}
+                      </TableCell>
+                      <TableCell className="text-gray-900">
+                        {user.employment?.department || 'N/A'}
+                      </TableCell>
+                      <TableCell className="text-gray-900 flex items-center">
+                        <Calendar className="w-3 h-3 mr-1 text-gray-400" />
+                        {user.lastLogin}
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(user.accountStatus)}>
+                          {user.accountStatus}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button variant="ghost" size="sm" title="View Profile">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" title="Edit User">
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" title="User Settings">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {!users.length && (
+                <div className="text-center py-8">
+                  <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+                  <p className="text-gray-600">No users match your current search criteria.</p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Users</p>
+                  <p className="text-2xl font-semibold text-gray-900">{users.length}</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Active Users</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {users.filter((u: any) => u.accountStatus === 'active').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Shield className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Admins</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {users.filter((u: any) => u.role === 'HR Admin').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Settings className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-white shadow-md border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Managers</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {users.filter((u: any) => u.role === 'Manager').length}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <Users className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}
