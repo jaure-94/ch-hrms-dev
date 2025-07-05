@@ -1,0 +1,52 @@
+Develop a web application for Human Resources management that allows companies to store and manage their employee information in a PostgreSQL database. The application will feature a multi-tenancy architecture, enabling multiple companies to operate independently within the same application.
+
+Requirements
+Database Schema
+
+Use PostgreSQL with the following schema:
+Company Table: Stores company details.
+Employee Table: Stores employee details linked to a specific company.
+Employment Table: Links employee data to employment details.
+Ensure all tables support UUIDs for unique identification.
+Frontend Development
+
+Use React with react-hook-form for form management.
+Implement a step-by-step form interface with a progress bar:
+Utilize the provided base code structure to create a navigation component.
+Separate input fields into logical sections for better user experience.
+Data Submission
+
+On form submission, validate and store employee data in the PostgreSQL database.
+Implement error handling for form submission failures.
+Contract Generation
+
+After successful data submission, query the database for relevant information.
+Generate a downloadable employment contract based on a DOCX template.
+Multi-Tenancy Architecture Considerations
+Database Design:
+
+Use foreign keys to associate employee and employment data with the correct company.
+Ensure all queries are filtered by company_id to maintain data isolation.
+Authentication and Authorization:
+
+Implement user authentication to restrict access to company data.
+Ensure that users can only access their own company's data.
+Scalability:
+
+Plan for future scalability by considering the addition of features like analytics, reporting, and user role management.
+Performance:
+
+Optimize database queries and indexing strategies to ensure quick data retrieval.
+Development Plan
+Set up the PostgreSQL database and tables.
+Create the React frontend using create-react-app.
+Implement the step-by-step form using react-hook-form.
+Develop the backend API to handle data storage and retrieval.
+Integrate the document generation functionality using a library like docx.
+Test the application for usability and performance.
+Tools and Libraries
+React
+react-hook-form
+PostgreSQL
+Express.js (for backend API)
+docx (for contract generation)
