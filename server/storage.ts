@@ -211,13 +211,17 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(contracts)
       .leftJoin(employees, eq(contracts.employeeId, employees.id))
+      .leftJoin(employments, eq(employees.id, employments.employeeId))
       .leftJoin(companies, eq(contracts.companyId, companies.id))
       .where(eq(contracts.companyId, companyId))
       .orderBy(desc(contracts.generatedAt));
 
     return result.map(row => ({
       ...row.contracts,
-      employee: row.employees!,
+      employee: row.employees ? {
+        ...row.employees,
+        employment: row.employments
+      } : null,
       company: row.companies!,
     }));
   }

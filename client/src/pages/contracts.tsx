@@ -25,12 +25,12 @@ export default function Contracts() {
 
   // Filter contracts based on search and filters
   const filteredContracts = contracts?.filter((contract: any) => {
-    const matchesDepartment = !departmentFilter || departmentFilter === 'all' || contract.employee.employment?.department === departmentFilter;
+    const matchesDepartment = !departmentFilter || departmentFilter === 'all' || contract.employee?.employment?.department === departmentFilter;
     const matchesStatus = !statusFilter || statusFilter === 'all' || contract.status === statusFilter;
     const matchesSearch = !searchQuery || 
-      contract.employee.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contract.employee.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contract.templateName.toLowerCase().includes(searchQuery.toLowerCase());
+      contract.employee?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contract.employee?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contract.templateName?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesDepartment && matchesStatus && matchesSearch;
   }) || [];
 
@@ -192,35 +192,35 @@ export default function Contracts() {
                     <TableRow key={contract.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="font-medium text-gray-900">
-                          {contract.employee.firstName} {contract.employee.lastName}
+                          {contract.employee?.firstName || 'N/A'} {contract.employee?.lastName || ''}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {contract.employee.email}
+                          {contract.employee?.email || 'N/A'}
                         </div>
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employee.employment?.jobTitle || 'N/A'}
+                        {contract.employee?.employment?.jobTitle || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employee.employment?.department || 'N/A'}
+                        {contract.employee?.employment?.department || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employee.employment?.startDate 
+                        {contract.employee?.employment?.startDate 
                           ? new Date(contract.employee.employment.startDate).toLocaleDateString()
                           : 'N/A'
                         }
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {contract.employee.employment?.endDate 
+                        {contract.employee?.employment?.endDate 
                           ? new Date(contract.employee.employment.endDate).toLocaleDateString()
                           : 'Ongoing'
                         }
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        £{contract.employee.employment?.baseSalary ? 
+                        £{contract.employee?.employment?.baseSalary ? 
                           Number(contract.employee.employment.baseSalary).toLocaleString() : 'N/A'}
                         <span className="text-sm text-gray-500 ml-1">
-                          /{contract.employee.employment?.payFrequency?.toLowerCase() || 'year'}
+                          /{contract.employee?.employment?.payFrequency?.toLowerCase() || 'year'}
                         </span>
                       </TableCell>
                       <TableCell>
