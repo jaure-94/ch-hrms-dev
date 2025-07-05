@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,8 @@ import {
   AlertCircle, 
   Calendar,
   Trash2,
-  Settings
+  Settings,
+  FileDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Breadcrumb from "@/components/breadcrumb";
@@ -39,63 +40,78 @@ export default function ContractTemplatePage() {
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [dragOver, setDragOver] = useState(false);
+  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Mock data for demonstration
-  const mockTemplates: ContractTemplate[] = [
-    {
-      id: "1",
-      name: "Standard Employment Contract",
-      fileName: "standard_contract_v3.docx",
-      uploadedDate: "2024-01-15",
-      uploadedBy: "Leo Kaluza",
-      version: 3,
-      isActive: true,
-      fileSize: "45 KB",
-      description: "Standard employment contract template with all required clauses"
-    },
-    {
-      id: "2",
-      name: "Senior Position Contract",
-      fileName: "senior_contract_v2.docx",
-      uploadedDate: "2024-01-10",
-      uploadedBy: "Leo Kaluza",
-      version: 2,
-      isActive: false,
-      fileSize: "52 KB",
-      description: "Contract template for senior positions with additional benefits"
-    },
-    {
-      id: "3",
-      name: "Temporary Contract",
-      fileName: "temp_contract_v1.docx",
-      uploadedDate: "2024-01-05",
-      uploadedBy: "Leo Kaluza",
-      version: 1,
-      isActive: false,
-      fileSize: "38 KB",
-      description: "Template for temporary employment contracts"
+  // Load templates from localStorage on component mount
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('contractTemplates');
+    if (savedTemplates) {
+      setTemplates(JSON.parse(savedTemplates));
+    } else {
+      // Initialize with default templates if none exist
+      const defaultTemplates: ContractTemplate[] = [
+        {
+          id: "1",
+          name: "Standard Employment Contract",
+          fileName: "standard_contract_v3.docx",
+          uploadedDate: "2024-01-15",
+          uploadedBy: "Leo Kaluza",
+          version: 3,
+          isActive: true,
+          fileSize: "45 KB",
+          description: "Standard employment contract template with all required clauses"
+        }
+      ];
+      setTemplates(defaultTemplates);
+      localStorage.setItem('contractTemplates', JSON.stringify(defaultTemplates));
     }
-  ];
+  }, []);
 
-  const templates = mockTemplates;
+  // Save templates to localStorage whenever templates change
+  useEffect(() => {
+    if (templates.length > 0) {
+      localStorage.setItem('contractTemplates', JSON.stringify(templates));
+    }
+  }, [templates]);
+
   const activeTemplate = templates.find(t => t.isActive);
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Simulate API call
+      // Simulate API call - in real app, this would upload to server
       await new Promise(resolve => setTimeout(resolve, 2000));
       return { success: true, id: Date.now().toString() };
     },
-    onSuccess: () => {
-      toast({
-        title: "Template uploaded successfully",
-        description: "The contract template has been uploaded and is now active.",
-      });
-      setUploadFile(null);
-      setTemplateName("");
-      setTemplateDescription("");
+    onSuccess: (data) => {
+      if (uploadFile && templateName) {
+        // Create new template object
+        const newTemplate: ContractTemplate = {
+          id: data.id,
+          name: templateName,
+          fileName: uploadFile.name,
+          uploadedDate: new Date().toISOString().split('T')[0],
+          uploadedBy: "Leo Kaluza",
+          version: 1,
+          isActive: true,
+          fileSize: `${Math.round(uploadFile.size / 1024)} KB`,
+          description: templateDescription || undefined
+        };
+
+        // Update templates - set all others to inactive, make new one active
+        const updatedTemplates = templates.map(t => ({ ...t, isActive: false }));
+        updatedTemplates.push(newTemplate);
+        setTemplates(updatedTemplates);
+
+        toast({
+          title: "Template uploaded successfully",
+          description: "The contract template has been uploaded and is now active.",
+        });
+        setUploadFile(null);
+        setTemplateName("");
+        setTemplateDescription("");
+      }
     },
     onError: () => {
       toast({
@@ -172,7 +188,7 @@ export default function ContractTemplatePage() {
   };
 
   const handleDownload = (template: ContractTemplate) => {
-    // Simulate download
+    // Simulate download of original Word document
     const link = document.createElement('a');
     link.href = '#';
     link.download = template.fileName;
@@ -184,7 +200,44 @@ export default function ContractTemplatePage() {
     });
   };
 
+  const handleDownloadPDF = async (template: ContractTemplate) => {
+    try {
+      toast({
+        title: "Generating PDF",
+        description: "Converting Word document to PDF format...",
+      });
+
+      // Simulate PDF conversion process
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Create PDF download
+      const pdfFileName = template.fileName.replace('.docx', '.pdf');
+      const link = document.createElement('a');
+      link.href = '#'; // In real app, this would be the generated PDF blob URL
+      link.download = pdfFileName;
+      link.click();
+
+      toast({
+        title: "PDF Download Started",
+        description: `Downloading ${pdfFileName}...`,
+      });
+    } catch (error) {
+      toast({
+        title: "PDF Generation Failed",
+        description: "Failed to convert the document to PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSetActive = (templateId: string) => {
+    // Update templates - set all to inactive except the selected one
+    const updatedTemplates = templates.map(t => ({
+      ...t,
+      isActive: t.id === templateId
+    }));
+    setTemplates(updatedTemplates);
+
     toast({
       title: "Template activated",
       description: "The selected template is now active and will be used for new contracts.",
@@ -233,13 +286,17 @@ export default function ContractTemplatePage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm" onClick={() => handleDownload(activeTemplate)}>
+                  <Button variant="outline" size="sm">
                     <Eye className="w-4 h-4 mr-2" />
                     View
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => handleDownload(activeTemplate)}>
                     <Download className="w-4 h-4 mr-2" />
-                    Download
+                    Download Word
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(activeTemplate)} className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300 hover:bg-red-50">
+                    <FileDown className="w-4 h-4 mr-2" />
+                    Download PDF
                   </Button>
                 </div>
               </div>
@@ -417,9 +474,18 @@ export default function ContractTemplatePage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDownload(template)}
-                            title="Download"
+                            title="Download Word Document"
                           >
                             <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadPDF(template)}
+                            title="Download PDF"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <FileDown className="w-4 h-4" />
                           </Button>
                           {!template.isActive && (
                             <Button
