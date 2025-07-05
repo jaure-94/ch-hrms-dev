@@ -28,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const contractFormSchema = z.object({
   employeeId: z.string().min(1, "Please select an employee"),
@@ -391,7 +392,15 @@ export default function ContractGeneratePage() {
                         <FormItem>
                           <FormLabel>Start Date</FormLabel>
                           <FormControl>
-                            <Input {...field} type="date" />
+                            <DatePicker
+                              date={field.value ? new Date(field.value) : undefined}
+                              onDateChange={(date) => {
+                                field.onChange(date ? date.toISOString().split('T')[0] : "");
+                              }}
+                              placeholder="Select start date"
+                              error={!!form.formState.errors.startDate}
+                              errorMessage={form.formState.errors.startDate?.message}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -405,7 +414,15 @@ export default function ContractGeneratePage() {
                         <FormItem>
                           <FormLabel>End Date (Optional)</FormLabel>
                           <FormControl>
-                            <Input {...field} type="date" />
+                            <DatePicker
+                              date={field.value ? new Date(field.value) : undefined}
+                              onDateChange={(date) => {
+                                field.onChange(date ? date.toISOString().split('T')[0] : "");
+                              }}
+                              placeholder="Select end date"
+                              error={!!form.formState.errors.endDate}
+                              errorMessage={form.formState.errors.endDate?.message}
+                            />
                           </FormControl>
                           <FormDescription>Leave blank for permanent positions</FormDescription>
                           <FormMessage />

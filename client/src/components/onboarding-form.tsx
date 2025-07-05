@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { DatePicker } from "@/components/ui/date-picker";
 
 const formSchema = z.object({
   // Personal Information
@@ -355,16 +356,19 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             
             <div>
               <Label htmlFor="startDate">Start Date *</Label>
-              <Input
-                id="startDate"
-                type="date"
-                {...form.register("startDate")}
+              <DatePicker
+                date={form.watch("startDate") ? new Date(form.watch("startDate")) : undefined}
+                onDateChange={(date) => {
+                  if (date) {
+                    form.setValue("startDate", date.toISOString().split('T')[0]);
+                  } else {
+                    form.setValue("startDate", "");
+                  }
+                }}
+                placeholder="Select start date"
+                error={!!form.formState.errors.startDate}
+                errorMessage={form.formState.errors.startDate?.message}
               />
-              {form.formState.errors.startDate && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.startDate.message}
-                </p>
-              )}
             </div>
             
             <div>

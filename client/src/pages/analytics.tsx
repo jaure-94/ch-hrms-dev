@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Download, BarChart, Activity, User, Clock, Shield, FileText, Filter } from "lucide-react";
+import PageHeader from "@/components/page-header";
 
 interface ActionLog {
   id: string;
@@ -200,29 +201,23 @@ export default function Analytics() {
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Analytics & Audit Logs</h1>
-            <p className="text-sm text-gray-600">Monitor system activity and user actions</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">
-              <Filter className="w-4 h-4 mr-2" />
-              Advanced Filters
-            </Button>
-            <Button variant="outline" onClick={handleExportLogs}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Excel File
-            </Button>
-            <Button>
-              <BarChart className="w-4 h-4 mr-2" />
-              Generate Report
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Analytics & Audit Logs"
+        description="Monitor system activity and user actions"
+      >
+        <Button variant="outline">
+          <Filter className="w-4 h-4 mr-2" />
+          Advanced Filters
+        </Button>
+        <Button variant="outline" onClick={handleExportLogs}>
+          <Download className="w-4 h-4 mr-2" />
+          Export Excel File
+        </Button>
+        <Button>
+          <BarChart className="w-4 h-4 mr-2" />
+          Generate Report
+        </Button>
+      </PageHeader>
 
       {/* Main Content */}
       <main className="flex-1 p-6">

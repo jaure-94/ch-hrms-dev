@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Search, Download, Plus, Eye, Edit, FileText } from "lucide-react";
 import EmployeeTable from "@/components/employee-table";
+import { Link } from "wouter";
+import PageHeader from "@/components/page-header";
 
 export default function Employees() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,25 +55,21 @@ export default function Employees() {
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Employee Directory</h1>
-            <p className="text-sm text-gray-600">Manage your organization's employees</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export Data
-            </Button>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Employee
-            </Button>
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Employee Directory"
+        description="Manage your organization's employees"
+      >
+        <Button variant="outline">
+          <Download className="w-4 h-4 mr-2" />
+          Export Data
+        </Button>
+        <Link href="/onboarding">
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Employee
+          </Button>
+        </Link>
+      </PageHeader>
 
       {/* Main Content */}
       <main className="flex-1 p-6">

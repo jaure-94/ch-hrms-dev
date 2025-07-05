@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, Users, FileText, UserPlus, RefreshCw, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/page-header";
+import { Link } from "wouter";
 
 export default function Dashboard() {
   // For demo purposes, using a hardcoded company ID
@@ -82,10 +83,12 @@ export default function Dashboard() {
           <Building className="w-4 h-4 mr-2" />
           Export Data
         </Button>
-        <Button>
-          <UserPlus className="w-4 h-4 mr-2" />
-          Quick Add Employee
-        </Button>
+        <Link href="/onboarding">
+          <Button>
+            <UserPlus className="w-4 h-4 mr-2" />
+            Quick Add Employee
+          </Button>
+        </Link>
       </PageHeader>
 
       {/* Main Content */}
