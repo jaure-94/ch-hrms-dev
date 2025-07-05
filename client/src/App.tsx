@@ -40,14 +40,14 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <div className="min-h-screen bg-slate-50 flex">
+        <div className="min-h-screen bg-slate-50">
           <Sidebar 
             selectedCompanyId={selectedCompanyId} 
             onCompanySelect={setSelectedCompanyId}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           />
-          <div className="flex-1 flex flex-col">
+          <div className={`${isSidebarCollapsed ? 'ml-16' : 'ml-64'} transition-all duration-300 ease-in-out min-h-screen`}>
             <Router />
           </div>
         </div>

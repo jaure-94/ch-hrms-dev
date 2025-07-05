@@ -48,7 +48,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
   };
 
   return (
-    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white shadow-lg border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out relative h-screen`}>
+    <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white shadow-lg border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out fixed left-0 top-0 h-screen z-50`}>
       {/* Toggle Button */}
       <div className="absolute -right-3 top-6 z-10">
         <Button
