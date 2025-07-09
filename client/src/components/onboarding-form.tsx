@@ -616,31 +616,117 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       {currentStep === 5 && (
         <div className="space-y-6">
           <div className="bg-gray-50 p-6 rounded-lg">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Review Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="font-medium">Name:</p>
-                <p className="text-gray-600">{form.watch("firstName")} {form.watch("lastName")}</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-6">Review Employee Information</h3>
+            
+            {/* Personal Information */}
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Personal Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">Full Name</p>
+                  <p className="text-gray-600">{form.watch("firstName")} {form.watch("lastName")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Email Address</p>
+                  <p className="text-gray-600">{form.watch("email")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Phone Number</p>
+                  <p className="text-gray-600">{form.watch("phoneNumber")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Date of Birth</p>
+                  <p className="text-gray-600">{form.watch("dateOfBirth")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Address</p>
+                  <p className="text-gray-600">{form.watch("address")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">National Insurance Number</p>
+                  <p className="text-gray-600">{form.watch("nationalInsuranceNumber")}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Email:</p>
-                <p className="text-gray-600">{form.watch("email")}</p>
+            </div>
+
+            {/* Employment Information */}
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Employment Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">Job Title</p>
+                  <p className="text-gray-600">{form.watch("jobTitle")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Department</p>
+                  <p className="text-gray-600">{form.watch("department")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Employment Status</p>
+                  <p className="text-gray-600">{form.watch("employmentStatus")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Start Date</p>
+                  <p className="text-gray-600">{form.watch("startDate")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Location</p>
+                  <p className="text-gray-600">{form.watch("location")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Base Salary</p>
+                  <p className="text-gray-600">£{form.watch("baseSalary")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Pay Frequency</p>
+                  <p className="text-gray-600">{form.watch("payFrequency")}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Job Title:</p>
-                <p className="text-gray-600">{form.watch("jobTitle")}</p>
+            </div>
+
+            {/* Contract Information */}
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Contract Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">Payment Method</p>
+                  <p className="text-gray-600">{form.watch("paymentMethod")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Marital Status</p>
+                  <p className="text-gray-600">{form.watch("maritalStatus")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Tax Code</p>
+                  <p className="text-gray-600">{form.watch("taxCode")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Visa Category</p>
+                  <p className="text-gray-600">{form.watch("visaCategory")}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Department:</p>
-                <p className="text-gray-600">{form.watch("department")}</p>
-              </div>
-              <div>
-                <p className="font-medium">Base Salary:</p>
-                <p className="text-gray-600">£{form.watch("baseSalary")}</p>
-              </div>
-              <div>
-                <p className="font-medium">Start Date:</p>
-                <p className="text-gray-600">{form.watch("startDate")}</p>
+            </div>
+
+            {/* Manager & Emergency Contact */}
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Manager & Emergency Contact</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">Manager</p>
+                  <p className="text-gray-600">{form.watch("manager")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Name</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactName")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Phone</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactPhone")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Relationship</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactRelationship")}</p>
+                </div>
               </div>
             </div>
           </div>
