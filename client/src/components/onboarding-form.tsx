@@ -188,7 +188,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
   }
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+    <div className="space-y-6">
       {/* Step 1: Personal Information */}
       {currentStep === 1 && (
         <div className="space-y-6">
@@ -636,7 +636,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
               </div>
               <div>
                 <p className="font-medium">Base Salary:</p>
-                <p className="text-gray-600">${form.watch("baseSalary")}</p>
+                <p className="text-gray-600">£{form.watch("baseSalary")}</p>
               </div>
               <div>
                 <p className="font-medium">Start Date:</p>
@@ -666,7 +666,10 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
           </Button>
         ) : (
           <Button 
-            type="submit" 
+            type="button" 
+            onClick={() => {
+              form.handleSubmit(handleSubmit)();
+            }}
             disabled={createEmployeeMutation.isPending}
           >
             {createEmployeeMutation.isPending ? "Creating..." : "Create Employee"}
@@ -674,6 +677,6 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
           </Button>
         )}
       </div>
-    </form>
+    </div>
   );
 }
