@@ -34,9 +34,9 @@ const formSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
-  emergencyContactRelationship: z.string().optional(),
+  emergencyContactName: z.string().min(1, "Emergency contact name is required"),
+  emergencyContactPhone: z.string().min(1, "Emergency contact phone is required"),
+  emergencyContactRelationship: z.string().min(1, "Emergency contact relationship is required"),
   
   // Employment Information
   jobTitle: z.string().min(1, "Job title is required"),
@@ -157,7 +157,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       case 3:
         return ['paymentMethod', 'maritalStatus', 'taxCode', 'visaCategory'];
       case 4:
-        return ['manager', 'emergencyContactName', 'emergencyContactPhone'];
+        return ['manager', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
+      case 5:
+        return []; // Review step, no specific fields to validate
       default:
         return [];
     }
@@ -565,38 +567,53 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="emergencyContactName">Contact Name</Label>
+                <Label htmlFor="emergencyContactName">Contact Name *</Label>
                 <Input
                   id="emergencyContactName"
                   {...form.register("emergencyContactName")}
                   placeholder="Jane Doe"
                 />
+                {form.formState.errors.emergencyContactName && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactName.message}
+                  </p>
+                )}
               </div>
               
               <div>
-                <Label htmlFor="emergencyContactPhone">Contact Phone</Label>
+                <Label htmlFor="emergencyContactPhone">Contact Phone *</Label>
                 <Input
                   id="emergencyContactPhone"
                   {...form.register("emergencyContactPhone")}
                   placeholder="(555) 123-4567"
                 />
+                {form.formState.errors.emergencyContactPhone && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactPhone.message}
+                  </p>
+                )}
               </div>
               
               <div>
-                <Label htmlFor="emergencyContactRelationship">Relationship</Label>
+                <Label htmlFor="emergencyContactRelationship">Relationship *</Label>
                 <Input
                   id="emergencyContactRelationship"
                   {...form.register("emergencyContactRelationship")}
                   placeholder="Spouse"
                 />
+                {form.formState.errors.emergencyContactRelationship && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactRelationship.message}
+                  </p>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Step 4: Review & Submit */}
-      {currentStep === 4 && (
+      {/* Step 5: Review & Submit */}
+      {currentStep === 5 && (
         <div className="space-y-6">
           <div className="bg-gray-50 p-6 rounded-lg">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Review Information</h3>

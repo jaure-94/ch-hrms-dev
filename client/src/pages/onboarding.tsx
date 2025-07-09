@@ -8,13 +8,14 @@ import PageHeader from "@/components/page-header";
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 4;
+  const totalSteps = 5;
   
   const steps = [
     "Personal Info",
     "Employment Details", 
     "Contract Info",
-    "Manager & Emergency Contact"
+    "Manager & Emergency Contact",
+    "Review & Submit"
   ];
 
   const progress = (currentStep / totalSteps) * 100;
@@ -28,10 +29,6 @@ export default function Onboarding() {
         <Button variant="outline">
           <Download className="w-4 h-4 mr-2" />
           Export Data
-        </Button>
-        <Button>
-          <Plus className="w-4 h-4 mr-2" />
-          Quick Add Employee
         </Button>
       </PageHeader>
 
