@@ -141,7 +141,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         title: "Employee Created Successfully",
         description: "The new employee has been added to your organization.",
       });
+      // Invalidate both companies and employees queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', '68f11a7e-27ab-40eb-826e-3ce6d84874de', 'employees'] });
       onStepChange(totalSteps + 1); // Move to success step
     },
     onError: (error: any) => {

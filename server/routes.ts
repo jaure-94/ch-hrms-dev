@@ -10,24 +10,37 @@ const employeeFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  phoneNumber: z.string().min(1, "Phone number is required"),
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
-  emergencyContact: z.object({
-    name: z.string().optional(),
-    phone: z.string().optional(),
-    relationship: z.string().optional(),
-  }).optional(),
+  nationalInsuranceNumber: z.string().min(1, "National Insurance Number is required"),
+  gender: z.string().min(1, "Gender is required"),
+  maritalStatus: z.string().min(1, "Marital status is required"),
+  emergencyContactName: z.string().min(1, "Emergency contact name is required"),
+  emergencyContactPhone: z.string().min(1, "Emergency contact phone is required"),
+  emergencyContactRelationship: z.string().min(1, "Emergency contact relationship is required"),
+  
+  // VISA/Immigration Information
+  passportNumber: z.string().optional(),
+  passportIssueDate: z.string().optional(),
+  passportExpiryDate: z.string().optional(),
+  visaIssueDate: z.string().optional(),
+  visaExpiryDate: z.string().optional(),
+  visaCategory: z.string().optional(),
+  dbsCertificateNumber: z.string().optional(),
   
   // Employment Information
   jobTitle: z.string().min(1, "Job title is required"),
   department: z.string().min(1, "Department is required"),
   manager: z.string().optional(),
-  employmentType: z.string().min(1, "Employment type is required"),
+  employmentStatus: z.string().min(1, "Employment status is required"),
   baseSalary: z.string().min(1, "Base salary is required"),
   payFrequency: z.string().min(1, "Pay frequency is required"),
   startDate: z.string().min(1, "Start date is required"),
   location: z.string().min(1, "Location is required"),
+  weeklyHours: z.string().min(1, "Weekly hours is required"),
+  paymentMethod: z.string().min(1, "Payment method is required"),
+  taxCode: z.string().min(1, "Tax code is required"),
   benefits: z.array(z.string()).optional(),
   
   // Company
@@ -110,10 +123,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
         email: validatedData.email,
-        phone: validatedData.phone,
+        phone: validatedData.phoneNumber,
         address: validatedData.address,
         dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : undefined,
-        emergencyContact: validatedData.emergencyContact,
+        nationalInsuranceNumber: validatedData.nationalInsuranceNumber,
+        gender: validatedData.gender,
+        maritalStatus: validatedData.maritalStatus,
+        emergencyContact: {
+          name: validatedData.emergencyContactName,
+          phone: validatedData.emergencyContactPhone,
+          relationship: validatedData.emergencyContactRelationship,
+        },
+        // VISA/Immigration fields
+        passportNumber: validatedData.passportNumber,
+        passportIssueDate: validatedData.passportIssueDate ? new Date(validatedData.passportIssueDate) : undefined,
+        passportExpiryDate: validatedData.passportExpiryDate ? new Date(validatedData.passportExpiryDate) : undefined,
+        visaIssueDate: validatedData.visaIssueDate ? new Date(validatedData.visaIssueDate) : undefined,
+        visaExpiryDate: validatedData.visaExpiryDate ? new Date(validatedData.visaExpiryDate) : undefined,
+        visaCategory: validatedData.visaCategory,
+        dbsCertificateNumber: validatedData.dbsCertificateNumber,
       };
 
       const employmentData = {
@@ -122,11 +150,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         jobTitle: validatedData.jobTitle,
         department: validatedData.department,
         manager: validatedData.manager,
-        employmentType: validatedData.employmentType,
+        employmentStatus: validatedData.employmentStatus,
         baseSalary: validatedData.baseSalary,
         payFrequency: validatedData.payFrequency,
         startDate: new Date(validatedData.startDate),
         location: validatedData.location,
+        weeklyHours: validatedData.weeklyHours,
+        paymentMethod: validatedData.paymentMethod,
+        taxCode: validatedData.taxCode,
         benefits: validatedData.benefits,
       };
 
