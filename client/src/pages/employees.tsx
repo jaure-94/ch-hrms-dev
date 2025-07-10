@@ -21,6 +21,14 @@ export default function Employees() {
   
   const { data: employees, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'employees', searchQuery],
+    queryFn: async () => {
+      const searchParam = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
+      const response = await fetch(`/api/companies/${companyId}/employees${searchParam}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch employees');
+      }
+      return response.json();
+    },
     enabled: !!companyId,
   });
 
