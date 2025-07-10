@@ -98,6 +98,14 @@
   .stats-card {
     @apply bg-white rounded-lg shadow-md border border-gray-200 p-6;
   }
+
+  .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm;
+  }
+
+  .form-select {
+    @apply appearance-none bg-white;
+  }
   
   .employee-row {
     @apply hover:bg-gray-50 transition-colors;
