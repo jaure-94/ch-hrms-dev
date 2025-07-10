@@ -3,17 +3,49 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { User, Eye, Edit, Download } from "lucide-react";
+import EmployeeDetailsModal from "./employee-details-modal";
 
 interface Employee {
   id: string;
   firstName: string;
   lastName: string;
   email: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string;
+  nationalInsuranceNumber?: string;
+  gender?: string;
+  maritalStatus?: string;
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relationship: string;
+  };
+  passportNumber?: string;
+  passportIssueDate?: string;
+  passportExpiryDate?: string;
+  visaIssueDate?: string;
+  visaExpiryDate?: string;
+  visaCategory?: string;
+  dbsCertificateNumber?: string;
   employment: {
     jobTitle: string;
     department: string;
-    status: string;
+    manager?: string;
+    employmentStatus: string;
+    baseSalary: string;
+    payFrequency: string;
     startDate: string;
+    location: string;
+    weeklyHours?: string;
+    paymentMethod?: string;
+    taxCode?: string;
+    benefits?: string[];
+    status: string;
+  };
+  company: {
+    name: string;
+    address?: string;
   };
 }
 
@@ -25,6 +57,8 @@ interface EmployeeTableProps {
 
 export default function EmployeeTable({ employees, isLoading, onDownloadContract }: EmployeeTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const itemsPerPage = 10;
   const totalPages = Math.ceil(employees.length / itemsPerPage);
   
@@ -32,6 +66,16 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );
+
+  const handleViewEmployee = (employee: Employee) => {
+    setSelectedEmployee(employee);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedEmployee(null);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status?.toLowerCase()) {
@@ -123,16 +167,22 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end space-x-2">
-                    <Button variant="ghost" size="sm">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleViewEmployee(employee)}
+                      title="View Employee Details"
+                    >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" title="Edit Employee">
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => onDownloadContract(employee.id)}
+                      title="Download Contract"
                     >
                       <Download className="w-4 h-4" />
                     </Button>
@@ -180,6 +230,13 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
           </div>
         </div>
       )}
+
+      {/* Employee Details Modal */}
+      <EmployeeDetailsModal
+        employee={selectedEmployee}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+      />
     </div>
   );
 }

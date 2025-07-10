@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
 import { Search, Download, Plus, Eye, Edit, FileText } from "lucide-react";
 import EmployeeTable from "@/components/employee-table";
 import { Link } from "wouter";
@@ -14,7 +14,7 @@ export default function Employees() {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
   
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
@@ -132,18 +132,7 @@ export default function Employees() {
         </Card>
       </main>
 
-      {/* Employee Details Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Employee Details</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Employee details would go here */}
-            <p className="text-gray-600">Employee details and edit form would be displayed here.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }
