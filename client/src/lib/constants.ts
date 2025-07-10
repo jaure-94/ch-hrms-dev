@@ -29,6 +29,13 @@ export const employmentStatuses: string[] = [
   'Contractor'
 ];
 
+export const genders: string[] = [
+  'Male',
+  'Female',
+  'Other',
+  'Prefer not to say'
+];
+
 export const payFrequency: string[] = [
   'Hourly',
   'Daily',

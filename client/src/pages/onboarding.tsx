@@ -8,10 +8,11 @@ import PageHeader from "@/components/page-header";
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 5;
+  const totalSteps = 6;
   
   const steps = [
     "Personal Info",
+    "VISA & Immigration",
     "Employment Details", 
     "Contract Info",
     "Manager & Emergency Contact",

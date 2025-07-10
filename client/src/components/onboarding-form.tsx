@@ -23,7 +23,8 @@ import {
   maritalStatuses, 
   taxCodes, 
   visaCategories, 
-  ukLocations 
+  ukLocations,
+  genders 
 } from "@/lib/constants";
 
 const formSchema = z.object({
@@ -31,22 +32,33 @@ const formSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
+  phoneNumber: z.string().min(1, "Phone number is required"),
   address: z.string().optional(),
   dateOfBirth: z.string().optional(),
+  nationalInsuranceNumber: z.string().min(1, "National Insurance Number is required"),
+  gender: z.string().min(1, "Gender is required"),
   emergencyContactName: z.string().min(1, "Emergency contact name is required"),
   emergencyContactPhone: z.string().min(1, "Emergency contact phone is required"),
   emergencyContactRelationship: z.string().min(1, "Emergency contact relationship is required"),
+  
+  // VISA/Immigration Information
+  passportNumber: z.string().optional(),
+  passportIssueDate: z.string().optional(),
+  passportExpiryDate: z.string().optional(),
+  visaIssueDate: z.string().optional(),
+  visaExpiryDate: z.string().optional(),
+  dbsCertificateNumber: z.string().optional(),
   
   // Employment Information
   jobTitle: z.string().min(1, "Job title is required"),
   department: z.string().min(1, "Department is required"),
   manager: z.string().optional(),
-  employmentType: z.string().min(1, "Employment type is required"),
+  employmentStatus: z.string().min(1, "Employment status is required"),
   baseSalary: z.string().min(1, "Base salary is required"),
   payFrequency: z.string().min(1, "Pay frequency is required"),
   startDate: z.string().min(1, "Start date is required"),
   location: z.string().min(1, "Location is required"),
+  weeklyHours: z.string().min(1, "Weekly hours is required"),
   benefits: z.array(z.string()).optional(),
   
   // Contract Information
@@ -78,20 +90,29 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       firstName: "",
       lastName: "",
       email: "",
-      phone: "",
+      phoneNumber: "",
       address: "",
       dateOfBirth: "",
+      nationalInsuranceNumber: "",
+      gender: "",
       emergencyContactName: "",
       emergencyContactPhone: "",
       emergencyContactRelationship: "",
+      passportNumber: "",
+      passportIssueDate: "",
+      passportExpiryDate: "",
+      visaIssueDate: "",
+      visaExpiryDate: "",
+      dbsCertificateNumber: "",
       jobTitle: "",
       department: "",
       manager: "",
-      employmentType: "",
+      employmentStatus: "",
       baseSalary: "",
       payFrequency: "",
       startDate: "",
       location: "",
+      weeklyHours: "",
       benefits: [],
       paymentMethod: "",
       maritalStatus: "",
@@ -151,14 +172,16 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
   const getCurrentStepFields = (): (keyof FormData)[] => {
     switch (currentStep) {
       case 1:
-        return ['firstName', 'lastName', 'email', 'phone', 'address', 'dateOfBirth'];
+        return ['firstName', 'lastName', 'email', 'phoneNumber', 'nationalInsuranceNumber', 'gender', 'address', 'dateOfBirth'];
       case 2:
-        return ['jobTitle', 'department', 'employmentType', 'baseSalary', 'payFrequency', 'startDate', 'location'];
+        return ['passportNumber', 'visaCategory']; // VISA Information - optional fields
       case 3:
-        return ['paymentMethod', 'maritalStatus', 'taxCode', 'visaCategory'];
+        return ['jobTitle', 'department', 'employmentStatus', 'baseSalary', 'payFrequency', 'startDate', 'location', 'weeklyHours'];
       case 4:
-        return ['manager', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
+        return ['paymentMethod', 'maritalStatus', 'taxCode'];
       case 5:
+        return ['manager', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
+      case 6:
         return []; // Review step, no specific fields to validate
       default:
         return [];
@@ -237,12 +260,53 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             </div>
             
             <div>
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phoneNumber">Phone Number *</Label>
               <Input
-                id="phone"
-                {...form.register("phone")}
-                placeholder="(555) 123-4567"
+                id="phoneNumber"
+                {...form.register("phoneNumber")}
+                placeholder="07123 456789"
               />
+              {form.formState.errors.phoneNumber && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.phoneNumber.message}
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="nationalInsuranceNumber">National Insurance Number *</Label>
+              <Input
+                id="nationalInsuranceNumber"
+                {...form.register("nationalInsuranceNumber")}
+                placeholder="QQ123456C"
+              />
+              {form.formState.errors.nationalInsuranceNumber && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.nationalInsuranceNumber.message}
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="gender">Gender *</Label>
+              <Select
+                value={form.watch("gender")}
+                onValueChange={(value) => form.setValue("gender", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  {genders.map((gender) => (
+                    <SelectItem key={gender} value={gender}>{gender}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.gender && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.gender.message}
+                </p>
+              )}
             </div>
             
             <div>
@@ -266,8 +330,95 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 2: Employment Details */}
+      {/* Step 2: VISA/Immigration Information */}
       {currentStep === 2 && (
+        <div className="space-y-6">
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
+              VISA & Immigration Information
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Complete this section only if applicable to your situation
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="passportNumber">Passport Number</Label>
+              <Input
+                id="passportNumber"
+                {...form.register("passportNumber")}
+                placeholder="123456789"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="visaCategory">VISA Category</Label>
+              <Select
+                value={form.watch("visaCategory")}
+                onValueChange={(value) => form.setValue("visaCategory", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select VISA Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visaCategories.map((category) => (
+                    <SelectItem key={category} value={category}>{category}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="passportIssueDate">Passport Issue Date</Label>
+              <Input
+                id="passportIssueDate"
+                type="date"
+                {...form.register("passportIssueDate")}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="passportExpiryDate">Passport Expiry Date</Label>
+              <Input
+                id="passportExpiryDate"
+                type="date"
+                {...form.register("passportExpiryDate")}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="visaIssueDate">VISA Issue Date</Label>
+              <Input
+                id="visaIssueDate"
+                type="date"
+                {...form.register("visaIssueDate")}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="visaExpiryDate">VISA Expiry Date</Label>
+              <Input
+                id="visaExpiryDate"
+                type="date"
+                {...form.register("visaExpiryDate")}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="dbsCertificateNumber">DBS Certificate Number</Label>
+              <Input
+                id="dbsCertificateNumber"
+                {...form.register("dbsCertificateNumber")}
+                placeholder="001234567890"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Employment Details */}
+      {currentStep === 3 && (
         <div className="space-y-6">
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
@@ -321,13 +472,13 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             </div>
             
             <div>
-              <Label htmlFor="employmentType">Employment Type *</Label>
+              <Label htmlFor="employmentStatus">Employment Status *</Label>
               <Select
-                value={form.watch("employmentType")}
-                onValueChange={(value) => form.setValue("employmentType", value)}
+                value={form.watch("employmentStatus")}
+                onValueChange={(value) => form.setValue("employmentStatus", value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select Employment Type" />
+                  <SelectValue placeholder="Select Employment Status" />
                 </SelectTrigger>
                 <SelectContent>
                   {employmentStatuses.map((status) => (
@@ -335,9 +486,9 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   ))}
                 </SelectContent>
               </Select>
-              {form.formState.errors.employmentType && (
+              {form.formState.errors.employmentStatus && (
                 <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.employmentType.message}
+                  {form.formState.errors.employmentStatus.message}
                 </p>
               )}
             </div>
@@ -421,6 +572,23 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                 </p>
               )}
             </div>
+            
+            <div>
+              <Label htmlFor="weeklyHours">Weekly Hours *</Label>
+              <Input
+                id="weeklyHours"
+                type="number"
+                {...form.register("weeklyHours")}
+                placeholder="40"
+                min="1"
+                max="168"
+              />
+              {form.formState.errors.weeklyHours && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.weeklyHours.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="mt-6">
@@ -451,8 +619,8 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 3: Contract Information */}
-      {currentStep === 3 && (
+      {/* Step 4: Contract Information */}
+      {currentStep === 4 && (
         <div className="space-y-6">
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
@@ -547,8 +715,8 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 4: Manager & Emergency Contact */}
-      {currentStep === 4 && (
+      {/* Step 5: Manager & Emergency Contact */}
+      {currentStep === 5 && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
@@ -612,8 +780,8 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 5: Review & Submit */}
-      {currentStep === 5 && (
+      {/* Step 6: Review & Submit */}
+      {currentStep === 6 && (
         <div className="space-y-6">
           <div className="bg-gray-50 p-6 rounded-lg">
             <h3 className="text-lg font-medium text-gray-900 mb-6">Review Employee Information</h3>
@@ -646,8 +814,39 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <p className="font-medium text-gray-900">National Insurance Number</p>
                   <p className="text-gray-600">{form.watch("nationalInsuranceNumber")}</p>
                 </div>
+                <div>
+                  <p className="font-medium text-gray-900">Gender</p>
+                  <p className="text-gray-600">{form.watch("gender")}</p>
+                </div>
               </div>
             </div>
+
+            {/* VISA Information */}
+            {(form.watch("passportNumber") || form.watch("visaCategory")) && (
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">VISA & Immigration Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  {form.watch("passportNumber") && (
+                    <div>
+                      <p className="font-medium text-gray-900">Passport Number</p>
+                      <p className="text-gray-600">{form.watch("passportNumber")}</p>
+                    </div>
+                  )}
+                  {form.watch("visaCategory") && (
+                    <div>
+                      <p className="font-medium text-gray-900">VISA Category</p>
+                      <p className="text-gray-600">{form.watch("visaCategory")}</p>
+                    </div>
+                  )}
+                  {form.watch("dbsCertificateNumber") && (
+                    <div>
+                      <p className="font-medium text-gray-900">DBS Certificate Number</p>
+                      <p className="text-gray-600">{form.watch("dbsCertificateNumber")}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Employment Information */}
             <div className="mb-6">
@@ -680,6 +879,10 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                 <div>
                   <p className="font-medium text-gray-900">Pay Frequency</p>
                   <p className="text-gray-600">{form.watch("payFrequency")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Weekly Hours</p>
+                  <p className="text-gray-600">{form.watch("weeklyHours")}</p>
                 </div>
               </div>
             </div>
