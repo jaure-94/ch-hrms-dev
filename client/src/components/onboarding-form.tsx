@@ -86,6 +86,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
+    mode: "onChange", // This makes validation errors disappear immediately when valid input is entered
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -172,16 +173,12 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
   const getCurrentStepFields = (): (keyof FormData)[] => {
     switch (currentStep) {
       case 1:
-        return ['firstName', 'lastName', 'email', 'phoneNumber', 'nationalInsuranceNumber', 'gender', 'address', 'dateOfBirth'];
+        return ['firstName', 'lastName', 'email', 'phoneNumber', 'nationalInsuranceNumber', 'gender', 'maritalStatus', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship', 'address', 'dateOfBirth'];
       case 2:
         return ['passportNumber', 'visaCategory']; // VISA Information - optional fields
       case 3:
-        return ['jobTitle', 'department', 'employmentStatus', 'baseSalary', 'payFrequency', 'startDate', 'location', 'weeklyHours'];
+        return ['jobTitle', 'department', 'employmentStatus', 'baseSalary', 'payFrequency', 'startDate', 'location', 'weeklyHours', 'manager', 'paymentMethod', 'taxCode'];
       case 4:
-        return ['paymentMethod', 'maritalStatus', 'taxCode'];
-      case 5:
-        return ['manager', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
-      case 6:
         return []; // Review step, no specific fields to validate
       default:
         return [];
@@ -317,6 +314,28 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                 {...form.register("dateOfBirth")}
               />
             </div>
+            
+            <div>
+              <Label htmlFor="maritalStatus">Marital Status *</Label>
+              <Select
+                value={form.watch("maritalStatus")}
+                onValueChange={(value) => form.setValue("maritalStatus", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Marital Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {maritalStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.maritalStatus && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.maritalStatus.message}
+                </p>
+              )}
+            </div>
           </div>
           
           <div>
@@ -326,6 +345,53 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
               {...form.register("address")}
               placeholder="123 Main Street, City, State 12345"
             />
+          </div>
+          
+          <div className="space-y-4">
+            <h4 className="text-lg font-medium text-gray-900">Emergency Contact Information</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <Label htmlFor="emergencyContactName">Emergency Contact Name *</Label>
+                <Input
+                  id="emergencyContactName"
+                  {...form.register("emergencyContactName")}
+                  placeholder="Jane Doe"
+                />
+                {form.formState.errors.emergencyContactName && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactName.message}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <Label htmlFor="emergencyContactPhone">Emergency Contact Phone *</Label>
+                <Input
+                  id="emergencyContactPhone"
+                  {...form.register("emergencyContactPhone")}
+                  placeholder="07123 456789"
+                />
+                {form.formState.errors.emergencyContactPhone && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactPhone.message}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <Label htmlFor="emergencyContactRelationship">Emergency Contact Relationship *</Label>
+                <Input
+                  id="emergencyContactRelationship"
+                  {...form.register("emergencyContactRelationship")}
+                  placeholder="Spouse"
+                />
+                {form.formState.errors.emergencyContactRelationship && (
+                  <p className="text-sm text-red-600 mt-1">
+                    {form.formState.errors.emergencyContactRelationship.message}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -589,6 +655,59 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                 </p>
               )}
             </div>
+            
+            <div>
+              <Label htmlFor="manager">Manager</Label>
+              <Input
+                id="manager"
+                {...form.register("manager")}
+                placeholder="John Smith - Engineering Director"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="paymentMethod">Payment Method *</Label>
+              <Select
+                value={form.watch("paymentMethod")}
+                onValueChange={(value) => form.setValue("paymentMethod", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Payment Method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {paymentMethods.map((method) => (
+                    <SelectItem key={method} value={method}>{method}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.paymentMethod && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.paymentMethod.message}
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="taxCode">Tax Code *</Label>
+              <Select
+                value={form.watch("taxCode")}
+                onValueChange={(value) => form.setValue("taxCode", value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Tax Code" />
+                </SelectTrigger>
+                <SelectContent>
+                  {taxCodes.map((code) => (
+                    <SelectItem key={code} value={code}>{code}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.taxCode && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.taxCode.message}
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="mt-6">
@@ -619,169 +738,8 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         </div>
       )}
 
-      {/* Step 4: Contract Information */}
+      {/* Step 4: Review & Submit */}
       {currentStep === 4 && (
-        <div className="space-y-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-              Contract Information
-            </h3>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="paymentMethod">Payment Method *</Label>
-              <Select
-                value={form.watch("paymentMethod")}
-                onValueChange={(value) => form.setValue("paymentMethod", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Payment Method" />
-                </SelectTrigger>
-                <SelectContent>
-                  {paymentMethods.map((method) => (
-                    <SelectItem key={method} value={method}>{method}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.paymentMethod && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.paymentMethod.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="maritalStatus">Marital Status *</Label>
-              <Select
-                value={form.watch("maritalStatus")}
-                onValueChange={(value) => form.setValue("maritalStatus", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Marital Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {maritalStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.maritalStatus && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.maritalStatus.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="taxCode">Tax Code *</Label>
-              <Select
-                value={form.watch("taxCode")}
-                onValueChange={(value) => form.setValue("taxCode", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Tax Code" />
-                </SelectTrigger>
-                <SelectContent>
-                  {taxCodes.map((code) => (
-                    <SelectItem key={code} value={code}>{code}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {form.formState.errors.taxCode && (
-                <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.taxCode.message}
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="visaCategory">Visa Category (if applicable)</Label>
-              <Select
-                value={form.watch("visaCategory")}
-                onValueChange={(value) => form.setValue("visaCategory", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Visa Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {visaCategories.map((category) => (
-                    <SelectItem key={category} value={category}>{category}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 5: Manager & Emergency Contact */}
-      {currentStep === 5 && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="manager">Manager</Label>
-              <Input
-                id="manager"
-                {...form.register("manager")}
-                placeholder="John Smith - Engineering Director"
-              />
-            </div>
-          </div>
-          
-          <div className="mt-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4 pb-2 border-b border-gray-200">
-              Emergency Contact
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label htmlFor="emergencyContactName">Contact Name *</Label>
-                <Input
-                  id="emergencyContactName"
-                  {...form.register("emergencyContactName")}
-                  placeholder="Jane Doe"
-                />
-                {form.formState.errors.emergencyContactName && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {form.formState.errors.emergencyContactName.message}
-                  </p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="emergencyContactPhone">Contact Phone *</Label>
-                <Input
-                  id="emergencyContactPhone"
-                  {...form.register("emergencyContactPhone")}
-                  placeholder="(555) 123-4567"
-                />
-                {form.formState.errors.emergencyContactPhone && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {form.formState.errors.emergencyContactPhone.message}
-                  </p>
-                )}
-              </div>
-              
-              <div>
-                <Label htmlFor="emergencyContactRelationship">Relationship *</Label>
-                <Input
-                  id="emergencyContactRelationship"
-                  {...form.register("emergencyContactRelationship")}
-                  placeholder="Spouse"
-                />
-                {form.formState.errors.emergencyContactRelationship && (
-                  <p className="text-sm text-red-600 mt-1">
-                    {form.formState.errors.emergencyContactRelationship.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 6: Review & Submit */}
-      {currentStep === 6 && (
         <div className="space-y-6">
           <div className="bg-gray-50 p-6 rounded-lg">
             <h3 className="text-lg font-medium text-gray-900 mb-6">Review Employee Information</h3>
@@ -817,6 +775,29 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                 <div>
                   <p className="font-medium text-gray-900">Gender</p>
                   <p className="text-gray-600">{form.watch("gender")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Marital Status</p>
+                  <p className="text-gray-600">{form.watch("maritalStatus")}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Emergency Contact Information */}
+            <div className="mb-6">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Emergency Contact Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Name</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactName")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Phone</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactPhone")}</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Emergency Contact Relationship</p>
+                  <p className="text-gray-600">{form.watch("emergencyContactRelationship")}</p>
                 </div>
               </div>
             </div>
@@ -884,51 +865,17 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
                   <p className="font-medium text-gray-900">Weekly Hours</p>
                   <p className="text-gray-600">{form.watch("weeklyHours")}</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Contract Information */}
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Contract Information</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="font-medium text-gray-900">Payment Method</p>
-                  <p className="text-gray-600">{form.watch("paymentMethod")}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Marital Status</p>
-                  <p className="text-gray-600">{form.watch("maritalStatus")}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Tax Code</p>
-                  <p className="text-gray-600">{form.watch("taxCode")}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Visa Category</p>
-                  <p className="text-gray-600">{form.watch("visaCategory")}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Manager & Emergency Contact */}
-            <div className="mb-6">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Manager & Emergency Contact</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="font-medium text-gray-900">Manager</p>
                   <p className="text-gray-600">{form.watch("manager")}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Emergency Contact Name</p>
-                  <p className="text-gray-600">{form.watch("emergencyContactName")}</p>
+                  <p className="font-medium text-gray-900">Payment Method</p>
+                  <p className="text-gray-600">{form.watch("paymentMethod")}</p>
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Emergency Contact Phone</p>
-                  <p className="text-gray-600">{form.watch("emergencyContactPhone")}</p>
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900">Emergency Contact Relationship</p>
-                  <p className="text-gray-600">{form.watch("emergencyContactRelationship")}</p>
+                  <p className="font-medium text-gray-900">Tax Code</p>
+                  <p className="text-gray-600">{form.watch("taxCode")}</p>
                 </div>
               </div>
             </div>
