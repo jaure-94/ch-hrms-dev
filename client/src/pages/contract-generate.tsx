@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +55,7 @@ export default function ContractGeneratePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTemplate, setActiveTemplate] = useState<any>(null);
   
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
@@ -63,6 +64,20 @@ export default function ContractGeneratePage() {
     queryKey: [`/api/companies/${companyId}/employees`],
     enabled: !!companyId,
   });
+
+  // Load active template on component mount
+  useEffect(() => {
+    const savedTemplates = localStorage.getItem('contractTemplates');
+    if (savedTemplates) {
+      try {
+        const templates = JSON.parse(savedTemplates);
+        const active = templates.find((t: any) => t.isActive);
+        setActiveTemplate(active);
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+    }
+  }, []);
 
 
   const form = useForm<ContractFormData>({
@@ -133,8 +148,23 @@ export default function ContractGeneratePage() {
 
   const generateContractMutation = useMutation({
     mutationFn: async (data: ContractFormData) => {
-      // Use the existing default contract template (base64 encoded)
-      const defaultTemplate = "RU1QTE9ZTUVOVCBDT05UUkFDVAoKVGhpcyBFbXBsb3ltZW50IENvbnRyYWN0ICgiQ29udHJhY3QiKSBpcyBlbnRlcmVkIGludG8gYmV0d2VlbiB7e2NvbXBhbnlOYW1lfX0gKCJDb21wYW55IikgYW5kIHt7ZnVsbE5hbWV9fSAoIkVtcGxveWVlIikgb24ge3tjdXJyZW50RGF0ZX19LgoKRU1QTE9ZRUUgSU5GT1JNQVRJT046Ck5hbWU6IHt7ZnVsbE5hbWV9fQpFbWFpbDoge3tlbWFpbH19ClBob25lOiB7e3Bob25lfX0KQWRkcmVzczoge3thZGRyZXNzfX0KCkVNUExPWU1FTlQgREVUQUlMUzoKUG9zaXRpb246IHt7am9iVGl0bGV9fQpEZXBhcnRtZW50OiB7e2RlcGFydG1lbnR9fQpTdGFydCBEYXRlOiB7e3N0YXJ0RGF0ZX19CkxvY2F0aW9uOiB7e2xvY2F0aW9ufX0KTWFuYWdlcjoge3ttYW5hZ2VyfX0KCkNPTVBFTlNBVElPTjoKQmFzZSBTYWxhcnk6IMKzIHt7YmFzZVNhbGFyeX19IHBlciB7e3BheUZyZXF1ZW5jeX19ClBheW1lbnQgTWV0aG9kOiB7e3BheW1lbnRNZXRob2R9fQpXZWVrbHkgSG91cnM6IHt7d2Vla2x5SG91cnN9fQoKVEVSTVMgQU5EIENPTkRJVElPTlM6CjEuIFRoaXMgY29udHJhY3QgaXMgZWZmZWN0aXZlIGZyb20ge3tzdGFydERhdGV9fSBhbmQgY29udGludWVzIHVudGlsIHRlcm1pbmF0ZWQgYnkgZWl0aGVyIHBhcnR5LgoyLiBUaGUgRW1wbG95ZWUgYWdyZWVzIHRvIHdvcmsge3t3ZWVrbHlIb3Vyc319IGhvdXJzIHBlciB3ZWVrLgozLiBUaGUgRW1wbG95ZWUgd2lsbCBiZSBiYXNlZCBhdCB7e2xvY2F0aW9ufX0uCjQuIFRoZSBFbXBsb3llZSByZXBvcnRzIHRvIHt7bWFuYWdlcn19LgoKQ09NUEFOWSBJTkZPUk1BVElPTjoKQ29tcGFueSBOYW1lOiB7e2NvbXBhbnlOYW1lfX0KQ29tcGFueSBBZGRyZXNzOiB7e2NvbXBhbnlBZGRyZXNzfX0KClRoaXMgY29udHJhY3QgaXMgZ292ZXJuZWQgYnkgdGhlIGxhd3Mgb2YgdGhlIFVuaXRlZCBLaW5nZG9tLgoKU2lnbmVkIG9uIHt7Y3VycmVudERhdGV9fQoKRW1wbG95ZWU6IHt7ZnVsbE5hbWV9fQpDb21wYW55OiB7e2NvbXBhbnlOYW1lfX0=";
+      // Get active template from localStorage
+      const savedTemplates = localStorage.getItem('contractTemplates');
+      let activeTemplate = null;
+      
+      if (savedTemplates) {
+        try {
+          const templates = JSON.parse(savedTemplates);
+          activeTemplate = templates.find((t: any) => t.isActive);
+        } catch (error) {
+          console.error('Error parsing saved templates:', error);
+        }
+      }
+      
+      // If no active template found, use default
+      if (!activeTemplate) {
+        throw new Error('No active contract template found. Please upload and activate a template first.');
+      }
       
       const response = await fetch(`/api/employees/${data.employeeId}/contract`, {
         method: 'POST',
@@ -142,9 +172,9 @@ export default function ContractGeneratePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          templateId: 'default-template',
-          templateContent: defaultTemplate,
-          templateName: 'Default Employment Contract',
+          templateId: activeTemplate.id,
+          templateContent: activeTemplate.fileContent,
+          templateName: activeTemplate.name,
           noticeWeeks: data.noticeWeeks ? parseInt(data.noticeWeeks) : null,
           contractDate: data.contractDate || null,
           probationPeriod: data.probationPeriod || null,
@@ -219,6 +249,23 @@ export default function ContractGeneratePage() {
         title="Generate New Contract"
         description="Create an employment contract for an existing employee"
       />
+
+      {/* Template Status Alert */}
+      {activeTemplate ? (
+        <Alert className="mx-6 mb-6">
+          <CheckCircle className="h-4 w-4" />
+          <AlertDescription>
+            Using active template: <strong>{activeTemplate.name}</strong> (v{activeTemplate.version})
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="mx-6 mb-6" variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No active contract template found. Please <Link href="/contract-template" className="underline">upload and activate a template</Link> first.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 p-6">
@@ -614,7 +661,7 @@ export default function ContractGeneratePage() {
                 </Link>
                 <Button 
                   type="submit" 
-                  disabled={generateContractMutation.isPending}
+                  disabled={generateContractMutation.isPending || !activeTemplate}
                   className="min-w-32"
                 >
                   {generateContractMutation.isPending ? (
