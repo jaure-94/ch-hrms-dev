@@ -294,6 +294,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Company variables
         companyName: employee.company?.name || '',
         companyAddress: employee.company?.address || '',
+        companyAddressStreet1: employee.company?.address?.split('\n')[0] || '',
+        companyAddressStreet2: employee.company?.address?.split('\n')[1] || '',
         companyPhone: employee.company?.phone || '',
         companyEmail: employee.company?.email || '',
         companyWebsite: employee.company?.website || '',
@@ -358,57 +360,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
         buffer = await fallbackTextReplacement(templateBuffer, variables);
       }
 
-      // Fallback function for text replacement
+      // Fallback function for text replacement - return original template if DOCX fails
       async function fallbackTextReplacement(templateBuffer, variables) {
-        let content = templateBuffer.toString('utf-8');
+        console.log('Fallback: Checking if template is DOCX...');
+        const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
         
-        // Replace variables using {{variableName}} pattern
-        Object.entries(variables).forEach(([key, value]) => {
-          if (typeof key !== 'string') return;
+        if (isDocxFile) {
+          console.log('Fallback: Template is DOCX, attempting simple variable replacement...');
           
-          try {
-            const patterns = [
-              new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
-              new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
-              new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
-            ];
+          // For DOCX files, try to do simple binary replacement of variables
+          // This is a basic approach that preserves the DOCX structure
+          let content = templateBuffer;
+          
+          // Convert buffer to string for replacement, then back to buffer
+          let contentStr = templateBuffer.toString('binary');
+          
+          // Replace variables using {{variableName}} pattern
+          Object.entries(variables).forEach(([key, value]) => {
+            if (typeof key !== 'string') return;
             
-            patterns.forEach(pattern => {
-              if (value !== undefined && value !== null) {
-                content = content.replace(pattern, value.toString());
-              } else {
-                content = content.replace(pattern, '');
-              }
-            });
-          } catch (error) {
-            // Skip problematic keys silently
-          }
-        });
+            try {
+              const patterns = [
+                `{{${key}}}`,           // {{firstName}}
+                `{{${key.toLowerCase()}}}`, // {{firstname}}
+                `{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, // {{first_name}}
+              ];
+              
+              patterns.forEach(pattern => {
+                if (value !== undefined && value !== null) {
+                  contentStr = contentStr.replace(new RegExp(pattern, 'g'), value.toString());
+                } else {
+                  contentStr = contentStr.replace(new RegExp(pattern, 'g'), '');
+                }
+              });
+            } catch (error) {
+              console.log(`Fallback: Error replacing ${key}:`, error);
+            }
+          });
 
-        // Create new DOCX document with processed content
-        const Document = (await import('docx')).Document;
-        const Packer = (await import('docx')).Packer;
-        const Paragraph = (await import('docx')).Paragraph;
-        const TextRun = (await import('docx')).TextRun;
+          console.log('Fallback: Variable replacement completed');
+          return Buffer.from(contentStr, 'binary');
+        } else {
+          console.log('Fallback: Template is not DOCX, creating new document...');
+          // For non-DOCX files, create a new DOCX document
+          let content = templateBuffer.toString('utf-8');
+          
+          // Replace variables using {{variableName}} pattern
+          Object.entries(variables).forEach(([key, value]) => {
+            if (typeof key !== 'string') return;
+            
+            try {
+              const patterns = [
+                new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
+                new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
+                new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
+              ];
+              
+              patterns.forEach(pattern => {
+                if (value !== undefined && value !== null) {
+                  content = content.replace(pattern, value.toString());
+                } else {
+                  content = content.replace(pattern, '');
+                }
+              });
+            } catch (error) {
+              // Skip problematic keys silently
+            }
+          });
 
-        const doc = new Document({
-          sections: [
-            {
-              properties: {},
-              children: content.split('\n').filter(line => line.trim()).map(line => 
-                new Paragraph({
-                  children: [
-                    new TextRun({
-                      text: line,
-                    }),
-                  ],
-                })
-              ),
-            },
-          ],
-        });
+          // Create new DOCX document with processed content
+          const Document = (await import('docx')).Document;
+          const Packer = (await import('docx')).Packer;
+          const Paragraph = (await import('docx')).Paragraph;
+          const TextRun = (await import('docx')).TextRun;
 
-        return await Packer.toBuffer(doc);
+          const doc = new Document({
+            sections: [
+              {
+                properties: {},
+                children: content.split('\n').filter(line => line.trim()).map(line => 
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: line,
+                      }),
+                    ],
+                  })
+                ),
+              },
+            ],
+          });
+
+          return await Packer.toBuffer(doc);
+        }
       }
 
       // Save contract to database
@@ -471,6 +515,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.send(buffer);
     } catch (error) {
       res.status(500).json({ message: "Failed to download contract" });
+    }
+  });
+
+  app.delete("/api/contracts/:id", async (req, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      await storage.deleteContract(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      console.error('Delete contract error:', error);
+      res.status(500).json({ message: "Failed to delete contract" });
     }
   });
 

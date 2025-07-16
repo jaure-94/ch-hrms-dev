@@ -1,15 +1,18 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw, Settings, MoreHorizontal, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import PageHeader from "@/components/page-header";
 import ContractViewModal from "@/components/contract-view-modal";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -17,6 +20,8 @@ export default function Contracts() {
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [selectedContract, setSelectedContract] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
@@ -24,6 +29,26 @@ export default function Contracts() {
   const { data: contracts, isLoading } = useQuery({
     queryKey: [`/api/companies/${companyId}/contracts`],
     enabled: !!companyId,
+  });
+
+  const deleteContractMutation = useMutation({
+    mutationFn: async (contractId: string) => {
+      await apiRequest(`/api/contracts/${contractId}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Contract deleted successfully",
+        description: "The contract has been removed from the system.",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contracts`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete contract",
+        description: error.message || "There was an error deleting the contract. Please try again.",
+        variant: "destructive",
+      });
+    }
   });
 
   // Filter contracts based on search and filters
@@ -71,6 +96,12 @@ export default function Contracts() {
       }
     } catch (error) {
       console.error('Failed to download contract:', error);
+    }
+  };
+
+  const handleDeleteContract = async (contractId: string) => {
+    if (confirm('Are you sure you want to delete this contract? This action cannot be undone.')) {
+      deleteContractMutation.mutate(contractId);
     }
   };
 
@@ -242,27 +273,34 @@ export default function Contracts() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            title="View Details"
-                            onClick={() => handleViewContract(contract)}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" title="Edit Contract">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDownloadContract(contract.id)}
-                            title="Download Contract"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewContract(contract)}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadContract(contract.id)}>
+                              <Download className="w-4 h-4 mr-2" />
+                              Download Contract
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Contract
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteContract(contract.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Contract
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
