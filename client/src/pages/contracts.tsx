@@ -22,7 +22,7 @@ export default function Contracts() {
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
   const { data: contracts, isLoading } = useQuery({
-    queryKey: ['/api/companies', companyId, 'contracts'],
+    queryKey: [`/api/companies/${companyId}/contracts`],
     enabled: !!companyId,
   });
 

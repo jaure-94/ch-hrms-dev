@@ -188,7 +188,7 @@ export default function ContractGeneratePage() {
         title: "Contract generated successfully",
         description: "The employment contract has been generated and is ready for download.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'contracts'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contracts`] });
       setLocation("/contracts");
     },
     onError: (error: any) => {
@@ -234,25 +234,24 @@ export default function ContractGeneratePage() {
         description="Create an employment contract for an existing employee"
       />
 
-      {/* Template Status Alert */}
-      {activeTemplate ? (
-        <Alert className="mx-6 mb-6">
-          <CheckCircle className="h-4 w-4" />
-          <AlertDescription>
-            Using active template: <strong>{activeTemplate.name}</strong> (v{activeTemplate.version})
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="mx-6 mb-6" variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            No active contract template found. Please <Link href="/contract-template" className="underline">upload and activate a template</Link> first.
-          </AlertDescription>
-        </Alert>
-      )}
-
       {/* Main Content */}
       <main className="flex-1 p-6">
+        {/* Template Status Alert */}
+        {activeTemplate ? (
+          <Alert className="mb-6">
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>
+              Using active template: <strong>{activeTemplate.name}</strong> (v{activeTemplate.version})
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="mb-6" variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No active contract template found. Please <Link href="/contract-template" className="underline">upload and activate a template</Link> first.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="max-w-4xl mx-auto">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

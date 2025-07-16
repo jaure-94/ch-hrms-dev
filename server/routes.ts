@@ -247,24 +247,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Convert base64 template content back to binary
       const templateBuffer = Buffer.from(templateContent, 'base64');
-      
-      // Try to determine if this is a DOCX file or plain text
-      let htmlContent = '';
-      
-      // Check if the buffer starts with DOCX file signature (PK)
-      const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
-      
-      if (isDocxFile) {
-        try {
-          const mammoth = await import('mammoth');
-          const result = await mammoth.convertToHtml({ buffer: templateBuffer });
-          htmlContent = result.value;
-        } catch (error) {
-          htmlContent = templateBuffer.toString('utf-8');
-        }
-      } else {
-        htmlContent = templateBuffer.toString('utf-8');
-      }
 
       // Create variable mapping from employee data
       const variables = {
@@ -326,63 +308,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employeeAddress: employee.address || '',
       };
 
-      // Replace variables in HTML content using {{variableName}} pattern
-      Object.entries(variables).forEach(([key, value]) => {
-        if (typeof key !== 'string') return;
-        
+      // Check if this is a DOCX file and use docx-templates for proper variable replacement
+      const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
+      
+      let buffer;
+      if (isDocxFile) {
+        // Use docx-templates for proper DOCX variable replacement with formatting preservation
         try {
-          const patterns = [
-            new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
-            new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
-            new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
-          ];
-          
-          patterns.forEach(pattern => {
-            if (value !== undefined && value !== null) {
-              htmlContent = htmlContent.replace(pattern, value.toString());
-            } else {
-              htmlContent = htmlContent.replace(pattern, '');
-            }
+          const { createReport } = await import('docx-templates');
+          buffer = await createReport({
+            template: templateBuffer,
+            data: variables,
+            additionalJsContext: {
+              // Add any additional JavaScript context if needed
+              formatDate: (date) => date ? new Date(date).toLocaleDateString() : '',
+              formatCurrency: (amount) => amount ? `£${parseFloat(amount).toLocaleString()}` : '',
+            },
           });
         } catch (error) {
-          // Skip problematic keys silently
+          console.error('Error using docx-templates:', error);
+          // Fallback to simple text replacement if docx-templates fails
+          buffer = await fallbackTextReplacement(templateBuffer, variables);
         }
-      });
+      } else {
+        // For non-DOCX files, use simple text replacement
+        buffer = await fallbackTextReplacement(templateBuffer, variables);
+      }
 
-      // Convert HTML back to DOCX
-      const Document = (await import('docx')).Document;
-      const Packer = (await import('docx')).Packer;
-      const Paragraph = (await import('docx')).Paragraph;
-      const TextRun = (await import('docx')).TextRun;
+      // Fallback function for text replacement
+      async function fallbackTextReplacement(templateBuffer, variables) {
+        let content = templateBuffer.toString('utf-8');
+        
+        // Replace variables using {{variableName}} pattern
+        Object.entries(variables).forEach(([key, value]) => {
+          if (typeof key !== 'string') return;
+          
+          try {
+            const patterns = [
+              new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
+              new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
+              new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
+            ];
+            
+            patterns.forEach(pattern => {
+              if (value !== undefined && value !== null) {
+                content = content.replace(pattern, value.toString());
+              } else {
+                content = content.replace(pattern, '');
+              }
+            });
+          } catch (error) {
+            // Skip problematic keys silently
+          }
+        });
 
-      // Simple HTML to text conversion for now (for basic templates)
-      const textContent = htmlContent
-        .replace(/<[^>]*>/g, '') // Remove HTML tags
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .trim();
+        // Create new DOCX document with processed content
+        const Document = (await import('docx')).Document;
+        const Packer = (await import('docx')).Packer;
+        const Paragraph = (await import('docx')).Paragraph;
+        const TextRun = (await import('docx')).TextRun;
 
-      // Create new document with processed content
-      const doc = new Document({
-        sections: [
-          {
-            properties: {},
-            children: textContent.split('\n').filter(line => line.trim()).map(line => 
-              new Paragraph({
-                children: [
-                  new TextRun({
-                    text: line,
-                  }),
-                ],
-              })
-            ),
-          },
-        ],
-      });
+        const doc = new Document({
+          sections: [
+            {
+              properties: {},
+              children: content.split('\n').filter(line => line.trim()).map(line => 
+                new Paragraph({
+                  children: [
+                    new TextRun({
+                      text: line,
+                    }),
+                  ],
+                })
+              ),
+            },
+          ],
+        });
 
-      const buffer = await Packer.toBuffer(doc);
+        return await Packer.toBuffer(doc);
+      }
 
       // Save contract to database
       const contractData = {
