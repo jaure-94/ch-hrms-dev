@@ -91,16 +91,38 @@ export default function ContractGeneratePage() {
       form.setValue("employeeId", employeeId);
       form.setValue("jobTitle", employee.employment?.jobTitle || "");
       form.setValue("department", employee.employment?.department || "");
+      form.setValue("manager", employee.employment?.manager || "");
       form.setValue("baseSalary", employee.employment?.baseSalary || "");
+      form.setValue("payFrequency", employee.employment?.payFrequency || "monthly");
+      form.setValue("startDate", employee.employment?.startDate || "");
       form.setValue("location", employee.employment?.location || "");
+      form.setValue("hoursPerWeek", employee.employment?.weeklyHours || "40");
     }
   };
 
   const generateContractMutation = useMutation({
     mutationFn: async (data: ContractFormData) => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      return { success: true, contractId: Date.now().toString() };
+      // Use the existing default contract template (base64 encoded)
+      const defaultTemplate = "RU1QTE9ZTUVOVCBDT05UUkFDVAoKVGhpcyBFbXBsb3ltZW50IENvbnRyYWN0ICgiQ29udHJhY3QiKSBpcyBlbnRlcmVkIGludG8gYmV0d2VlbiB7e2NvbXBhbnlOYW1lfX0gKCJDb21wYW55IikgYW5kIHt7ZnVsbE5hbWV9fSAoIkVtcGxveWVlIikgb24ge3tjdXJyZW50RGF0ZX19LgoKRU1QTE9ZRUUgSU5GT1JNQVRJT046Ck5hbWU6IHt7ZnVsbE5hbWV9fQpFbWFpbDoge3tlbWFpbH19ClBob25lOiB7e3Bob25lfX0KQWRkcmVzczoge3thZGRyZXNzfX0KCkVNUExPWU1FTlQgREVUQUlMUzoKUG9zaXRpb246IHt7am9iVGl0bGV9fQpEZXBhcnRtZW50OiB7e2RlcGFydG1lbnR9fQpTdGFydCBEYXRlOiB7e3N0YXJ0RGF0ZX19CkxvY2F0aW9uOiB7e2xvY2F0aW9ufX0KTWFuYWdlcjoge3ttYW5hZ2VyfX0KCkNPTVBFTlNBVElPTjoKQmFzZSBTYWxhcnk6IMKzIHt7YmFzZVNhbGFyeX19IHBlciB7e3BheUZyZXF1ZW5jeX19ClBheW1lbnQgTWV0aG9kOiB7e3BheW1lbnRNZXRob2R9fQpXZWVrbHkgSG91cnM6IHt7d2Vla2x5SG91cnN9fQoKVEVSTVMgQU5EIENPTkRJVElPTlM6CjEuIFRoaXMgY29udHJhY3QgaXMgZWZmZWN0aXZlIGZyb20ge3tzdGFydERhdGV9fSBhbmQgY29udGludWVzIHVudGlsIHRlcm1pbmF0ZWQgYnkgZWl0aGVyIHBhcnR5LgoyLiBUaGUgRW1wbG95ZWUgYWdyZWVzIHRvIHdvcmsge3t3ZWVrbHlIb3Vyc319IGhvdXJzIHBlciB3ZWVrLgozLiBUaGUgRW1wbG95ZWUgd2lsbCBiZSBiYXNlZCBhdCB7e2xvY2F0aW9ufX0uCjQuIFRoZSBFbXBsb3llZSByZXBvcnRzIHRvIHt7bWFuYWdlcn19LgoKQ09NUEFOWSBJTkZPUk1BVElPTjoKQ29tcGFueSBOYW1lOiB7e2NvbXBhbnlOYW1lfX0KQ29tcGFueSBBZGRyZXNzOiB7e2NvbXBhbnlBZGRyZXNzfX0KClRoaXMgY29udHJhY3QgaXMgZ292ZXJuZWQgYnkgdGhlIGxhd3Mgb2YgdGhlIFVuaXRlZCBLaW5nZG9tLgoKU2lnbmVkIG9uIHt7Y3VycmVudERhdGV9fQoKRW1wbG95ZWU6IHt7ZnVsbE5hbWV9fQpDb21wYW55OiB7e2NvbXBhbnlOYW1lfX0=";
+      
+      const response = await fetch(`/api/employees/${data.employeeId}/contract`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          templateId: 'default-template',
+          templateContent: defaultTemplate,
+          templateName: 'Default Employment Contract'
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate contract');
+      }
+      
+      return await response.json();
     },
     onSuccess: (result) => {
       toast({
@@ -110,10 +132,10 @@ export default function ContractGeneratePage() {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'contracts'] });
       setLocation("/contracts");
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Failed to generate contract",
-        description: "There was an error generating the contract. Please try again.",
+        description: error.message || "There was an error generating the contract. Please try again.",
         variant: "destructive",
       });
     }
