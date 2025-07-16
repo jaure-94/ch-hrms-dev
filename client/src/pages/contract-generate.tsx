@@ -65,19 +65,16 @@ export default function ContractGeneratePage() {
     enabled: !!companyId,
   });
 
-  // Load active template on component mount
+  // Load active template from database
+  const { data: activeTemplateData, isLoading: templateLoading } = useQuery({
+    queryKey: [`/api/companies/${companyId}/contract-templates/active`],
+    enabled: !!companyId,
+  });
+
+  // Update activeTemplate state when data changes
   useEffect(() => {
-    const savedTemplates = localStorage.getItem('contractTemplates');
-    if (savedTemplates) {
-      try {
-        const templates = JSON.parse(savedTemplates);
-        const active = templates.find((t: any) => t.isActive);
-        setActiveTemplate(active);
-      } catch (error) {
-        console.error('Error loading templates:', error);
-      }
-    }
-  }, []);
+    setActiveTemplate(activeTemplateData);
+  }, [activeTemplateData]);
 
 
   const form = useForm<ContractFormData>({
@@ -148,20 +145,7 @@ export default function ContractGeneratePage() {
 
   const generateContractMutation = useMutation({
     mutationFn: async (data: ContractFormData) => {
-      // Get active template from localStorage
-      const savedTemplates = localStorage.getItem('contractTemplates');
-      let activeTemplate = null;
-      
-      if (savedTemplates) {
-        try {
-          const templates = JSON.parse(savedTemplates);
-          activeTemplate = templates.find((t: any) => t.isActive);
-        } catch (error) {
-          console.error('Error parsing saved templates:', error);
-        }
-      }
-      
-      // If no active template found, use default
+      // Check if we have an active template
       if (!activeTemplate) {
         throw new Error('No active contract template found. Please upload and activate a template first.');
       }

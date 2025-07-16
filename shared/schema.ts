@@ -63,11 +63,26 @@ export const employments = pgTable("employments", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const contractTemplates = pgTable("contract_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  companyId: uuid("company_id").references(() => companies.id).notNull(),
+  name: text("name").notNull(),
+  fileName: text("file_name").notNull(),
+  fileContent: text("file_content").notNull(), // Base64 encoded DOCX content
+  fileSize: integer("file_size").notNull(),
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  isActive: boolean("is_active").notNull().default(false),
+  uploadedBy: text("uploaded_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const contracts = pgTable("contracts", {
   id: uuid("id").primaryKey().defaultRandom(),
   employeeId: uuid("employee_id").references(() => employees.id).notNull(),
   companyId: uuid("company_id").references(() => companies.id).notNull(),
-  templateId: text("template_id").notNull(),
+  templateId: uuid("template_id").references(() => contractTemplates.id).notNull(),
   templateName: text("template_name").notNull(),
   fileName: text("file_name").notNull(),
   fileContent: text("file_content").notNull(), // Base64 encoded file content
@@ -84,6 +99,7 @@ export const companyRelations = relations(companies, ({ many }) => ({
   employees: many(employees),
   employments: many(employments),
   contracts: many(contracts),
+  contractTemplates: many(contractTemplates),
 }));
 
 export const employeeRelations = relations(employees, ({ one, many }) => ({
@@ -106,6 +122,14 @@ export const employmentRelations = relations(employments, ({ one }) => ({
   }),
 }));
 
+export const contractTemplateRelations = relations(contractTemplates, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [contractTemplates.companyId],
+    references: [companies.id],
+  }),
+  contracts: many(contracts),
+}));
+
 export const contractRelations = relations(contracts, ({ one }) => ({
   employee: one(employees, {
     fields: [contracts.employeeId],
@@ -114,6 +138,10 @@ export const contractRelations = relations(contracts, ({ one }) => ({
   company: one(companies, {
     fields: [contracts.companyId],
     references: [companies.id],
+  }),
+  template: one(contractTemplates, {
+    fields: [contracts.templateId],
+    references: [contractTemplates.id],
   }),
 }));
 
@@ -135,6 +163,12 @@ export const insertEmploymentSchema = createInsertSchema(employments).omit({
   updatedAt: true,
 });
 
+export const insertContractTemplateSchema = createInsertSchema(contractTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertContractSchema = createInsertSchema(contracts).omit({
   id: true,
   createdAt: true,
@@ -144,10 +178,12 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
 export type Company = typeof companies.$inferSelect;
 export type Employee = typeof employees.$inferSelect;
 export type Employment = typeof employments.$inferSelect;
+export type ContractTemplate = typeof contractTemplates.$inferSelect;
 export type Contract = typeof contracts.$inferSelect;
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type InsertEmployment = z.infer<typeof insertEmploymentSchema>;
+export type InsertContractTemplate = z.infer<typeof insertContractTemplateSchema>;
 export type InsertContract = z.infer<typeof insertContractSchema>;
 
 export type EmployeeWithEmployment = Employee & {

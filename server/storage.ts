@@ -1,4 +1,4 @@
-import { companies, employees, employments, contracts, type Company, type Employee, type Employment, type Contract, type InsertCompany, type InsertEmployee, type InsertEmployment, type InsertContract, type EmployeeWithEmployment, type ContractWithDetails } from "@shared/schema";
+import { companies, employees, employments, contracts, contractTemplates, type Company, type Employee, type Employment, type Contract, type ContractTemplate, type InsertCompany, type InsertEmployee, type InsertEmployment, type InsertContract, type InsertContractTemplate, type EmployeeWithEmployment, type ContractWithDetails } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, like, ilike } from "drizzle-orm";
 
@@ -28,6 +28,15 @@ export interface IStorage {
   // Combined methods
   createEmployeeWithEmployment(employee: InsertEmployee, employment: InsertEmployment): Promise<EmployeeWithEmployment>;
   getEmployeeWithEmployment(employeeId: string): Promise<EmployeeWithEmployment | undefined>;
+
+  // Contract Template methods
+  getContractTemplate(id: string): Promise<ContractTemplate | undefined>;
+  getContractTemplatesByCompany(companyId: string): Promise<ContractTemplate[]>;
+  getActiveContractTemplate(companyId: string): Promise<ContractTemplate | undefined>;
+  createContractTemplate(template: InsertContractTemplate): Promise<ContractTemplate>;
+  updateContractTemplate(id: string, template: Partial<InsertContractTemplate>): Promise<ContractTemplate>;
+  deleteContractTemplate(id: string): Promise<void>;
+  setActiveContractTemplate(companyId: string, templateId: string): Promise<void>;
 
   // Contract methods
   getContract(id: string): Promise<Contract | undefined>;
@@ -201,6 +210,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Contract methods
+  // Contract Template methods
+  async getContractTemplate(id: string): Promise<ContractTemplate | undefined> {
+    const [template] = await db.select().from(contractTemplates).where(eq(contractTemplates.id, id));
+    return template || undefined;
+  }
+
+  async getContractTemplatesByCompany(companyId: string): Promise<ContractTemplate[]> {
+    return db.select().from(contractTemplates).where(eq(contractTemplates.companyId, companyId)).orderBy(desc(contractTemplates.createdAt));
+  }
+
+  async getActiveContractTemplate(companyId: string): Promise<ContractTemplate | undefined> {
+    const [template] = await db.select().from(contractTemplates).where(and(eq(contractTemplates.companyId, companyId), eq(contractTemplates.isActive, true)));
+    return template || undefined;
+  }
+
+  async createContractTemplate(template: InsertContractTemplate): Promise<ContractTemplate> {
+    const [newTemplate] = await db.insert(contractTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async updateContractTemplate(id: string, template: Partial<InsertContractTemplate>): Promise<ContractTemplate> {
+    const [updatedTemplate] = await db.update(contractTemplates).set(template).where(eq(contractTemplates.id, id)).returning();
+    return updatedTemplate;
+  }
+
+  async deleteContractTemplate(id: string): Promise<void> {
+    await db.delete(contractTemplates).where(eq(contractTemplates.id, id));
+  }
+
+  async setActiveContractTemplate(companyId: string, templateId: string): Promise<void> {
+    // First, set all templates for this company to inactive
+    await db.update(contractTemplates).set({ isActive: false }).where(eq(contractTemplates.companyId, companyId));
+    
+    // Then, set the specified template as active
+    await db.update(contractTemplates).set({ isActive: true }).where(and(eq(contractTemplates.id, templateId), eq(contractTemplates.companyId, companyId)));
+  }
+
   async getContract(id: string): Promise<Contract | undefined> {
     const [contract] = await db.select().from(contracts).where(eq(contracts.id, id));
     return contract || undefined;

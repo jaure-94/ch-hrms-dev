@@ -100,3 +100,4 @@ Changelog:
 - July 05, 2025. Initial setup
 - July 05, 2025. Enhanced UI with sophisticated date picker components, unified page headers, fixed sidebar positioning, and improved navigation flow
 - July 05, 2025. Updated application for UK market: changed currency to pounds sterling, updated locations to UK cities, added comprehensive contract information fields (payment method, marital status, tax code, visa category) to onboarding process with predefined select options
+- July 16, 2025. Implemented database-backed contract template system: migrated from localStorage to PostgreSQL database, added contract_templates table with proper relations, created API endpoints for template management, implemented automatic migration from localStorage to database, updated contract generation to use active database template

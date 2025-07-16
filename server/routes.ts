@@ -445,6 +445,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Contract Template routes
+  app.get("/api/companies/:companyId/contract-templates", async (req, res) => {
+    try {
+      const templates = await storage.getContractTemplatesByCompany(req.params.companyId);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch contract templates" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/contract-templates/active", async (req, res) => {
+    try {
+      const template = await storage.getActiveContractTemplate(req.params.companyId);
+      if (!template) {
+        return res.status(404).json({ message: "No active contract template found" });
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch active contract template" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/contract-templates", async (req, res) => {
+    try {
+      const { name, fileName, fileContent, fileSize, description, uploadedBy } = req.body;
+      
+      if (!name || !fileName || !fileContent || !fileSize || !uploadedBy) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      // First, deactivate all existing templates for this company
+      await storage.setActiveContractTemplate(req.params.companyId, "");
+
+      const template = await storage.createContractTemplate({
+        companyId: req.params.companyId,
+        name,
+        fileName,
+        fileContent,
+        fileSize,
+        description,
+        uploadedBy,
+        isActive: true, // New template becomes active by default
+      });
+
+      res.status(201).json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create contract template" });
+    }
+  });
+
+  app.put("/api/contract-templates/:id/activate", async (req, res) => {
+    try {
+      const template = await storage.getContractTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Contract template not found" });
+      }
+
+      await storage.setActiveContractTemplate(template.companyId, req.params.id);
+      res.json({ message: "Contract template activated successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to activate contract template" });
+    }
+  });
+
+  app.delete("/api/contract-templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getContractTemplate(req.params.id);
+      if (!template) {
+        return res.status(404).json({ message: "Contract template not found" });
+      }
+
+      await storage.deleteContractTemplate(req.params.id);
+      res.json({ message: "Contract template deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete contract template" });
+    }
+  });
+
   // Dashboard stats route
   app.get("/api/companies/:companyId/stats", async (req, res) => {
     try {

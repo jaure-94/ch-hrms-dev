@@ -41,48 +41,83 @@ export default function ContractTemplatePage() {
   const [templateName, setTemplateName] = useState("");
   const [templateDescription, setTemplateDescription] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [templates, setTemplates] = useState<ContractTemplate[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // For demo purposes, using a hardcoded company ID
+  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
 
-  // Load templates from localStorage on component mount
+  // Load templates from database
+  const { data: templates, isLoading: templatesLoading } = useQuery({
+    queryKey: [`/api/companies/${companyId}/contract-templates`],
+    enabled: !!companyId,
+  });
+
+  // Migrate existing localStorage data to database on component mount
   useEffect(() => {
-    const savedTemplates = localStorage.getItem('contractTemplates');
-    if (savedTemplates) {
-      try {
-        const parsedTemplates = JSON.parse(savedTemplates);
-        // Check if templates have the new fileContent property
-        const hasFileContent = parsedTemplates.some((t: any) => t.hasOwnProperty('fileContent'));
-        if (!hasFileContent) {
-          // Clear old format and start fresh
+    const migrateLocalStorageData = async () => {
+      const savedTemplates = localStorage.getItem('contractTemplates');
+      if (savedTemplates && companyId) {
+        try {
+          const parsedTemplates = JSON.parse(savedTemplates);
+          
+          // Only migrate if we have templates in localStorage and none in database
+          if (parsedTemplates.length > 0 && (!templates || templates.length === 0)) {
+            for (const template of parsedTemplates) {
+              if (template.fileContent) {
+                try {
+                  await fetch(`/api/companies/${companyId}/contract-templates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name: template.name,
+                      fileName: template.fileName,
+                      fileContent: template.fileContent,
+                      fileSize: template.fileSize ? parseInt(template.fileSize) : 0,
+                      description: template.description || '',
+                      uploadedBy: template.uploadedBy || 'System Migration',
+                    }),
+                  });
+                } catch (error) {
+                  console.error('Failed to migrate template:', template.name, error);
+                }
+              }
+            }
+            
+            // Clear localStorage after successful migration
+            localStorage.removeItem('contractTemplates');
+            
+            // Refetch templates
+            queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contract-templates`] });
+            
+            toast({
+              title: "Templates migrated",
+              description: "Your contract templates have been moved to the database.",
+            });
+          }
+        } catch (error) {
+          console.error('Error migrating templates:', error);
+          // Clear corrupted data
           localStorage.removeItem('contractTemplates');
-          setTemplates([]);
-        } else {
-          setTemplates(parsedTemplates);
         }
-      } catch (error) {
-        // Clear corrupted data
-        localStorage.removeItem('contractTemplates');
-        setTemplates([]);
       }
-    } else {
-      // Initialize with empty array - user needs to upload templates
-      setTemplates([]);
-    }
-  }, []);
+    };
 
-  // Save templates to localStorage whenever templates change
-  useEffect(() => {
-    if (templates.length > 0) {
-      localStorage.setItem('contractTemplates', JSON.stringify(templates));
-    }
-  }, [templates]);
+    migrateLocalStorageData();
+  }, [companyId, templates, queryClient, toast]);
 
-  const activeTemplate = templates.find(t => t.isActive);
+  const activeTemplate = templates?.find(t => t.isActive);
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const file = formData.get('file') as File;
+      const name = formData.get('name') as string;
+      const description = formData.get('description') as string;
+      
+      if (!file || !name) {
+        throw new Error('File and name are required');
+      }
+
       // Convert file to base64 for storage using FileReader
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -94,39 +129,38 @@ export default function ContractTemplatePage() {
         reader.readAsDataURL(file);
       });
       
-      // Simulate API call - in real app, this would upload to server
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      return { success: true, id: Date.now().toString(), fileContent: base64 };
-    },
-    onSuccess: (data) => {
-      if (uploadFile && templateName) {
-        // Create new template object
-        const newTemplate: ContractTemplate = {
-          id: data.id,
-          name: templateName,
-          fileName: uploadFile.name,
-          uploadedDate: new Date().toISOString().split('T')[0],
-          uploadedBy: "Leo Kaluza",
-          version: 1,
-          isActive: true,
-          fileSize: `${Math.round(uploadFile.size / 1024)} KB`,
-          description: templateDescription || undefined,
-          fileContent: data.fileContent
-        };
+      const response = await fetch(`/api/companies/${companyId}/contract-templates`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          fileName: file.name,
+          fileContent: base64,
+          fileSize: file.size,
+          description: description || '',
+          uploadedBy: 'Leo Kaluza',
+        }),
+      });
 
-        // Update templates - set all others to inactive, make new one active
-        const updatedTemplates = templates.map(t => ({ ...t, isActive: false }));
-        updatedTemplates.push(newTemplate);
-        setTemplates(updatedTemplates);
-
-        toast({
-          title: "Template uploaded successfully",
-          description: "The contract template has been uploaded and is now active.",
-        });
-        setUploadFile(null);
-        setTemplateName("");
-        setTemplateDescription("");
+      if (!response.ok) {
+        throw new Error('Failed to upload template');
       }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Template uploaded successfully",
+        description: "The contract template has been uploaded and is now active.",
+      });
+      setUploadFile(null);
+      setTemplateName("");
+      setTemplateDescription("");
+      
+      // Refetch templates
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contract-templates`] });
     },
     onError: () => {
       toast({
@@ -355,18 +389,30 @@ export default function ContractTemplatePage() {
     }
   };
 
-  const handleSetActive = (templateId: string) => {
-    // Update templates - set all to inactive except the selected one
-    const updatedTemplates = templates.map(t => ({
-      ...t,
-      isActive: t.id === templateId
-    }));
-    setTemplates(updatedTemplates);
+  const handleSetActive = async (templateId: string) => {
+    try {
+      const response = await fetch(`/api/contract-templates/${templateId}/activate`, {
+        method: 'PUT',
+      });
 
-    toast({
-      title: "Template activated",
-      description: "The selected template is now active and will be used for new contracts.",
-    });
+      if (!response.ok) {
+        throw new Error('Failed to activate template');
+      }
+
+      toast({
+        title: "Template activated",
+        description: "The selected template is now active and will be used for new contracts.",
+      });
+      
+      // Refetch templates
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contract-templates`] });
+    } catch (error) {
+      toast({
+        title: "Activation failed",
+        description: "Failed to activate the contract template. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -582,7 +628,17 @@ export default function ContractTemplatePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {templates.map((template) => (
+                  {templatesLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                          <span className="ml-2">Loading templates...</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : templates && templates.length > 0 ? (
+                    templates.map((template) => (
                     <TableRow key={template.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -598,8 +654,8 @@ export default function ContractTemplatePage() {
                       <TableCell>
                         <Badge variant="outline">v{template.version}</Badge>
                       </TableCell>
-                      <TableCell className="text-gray-900">{template.fileSize}</TableCell>
-                      <TableCell className="text-gray-900">{template.uploadedDate}</TableCell>
+                      <TableCell className="text-gray-900">{Math.round(template.fileSize / 1024)} KB</TableCell>
+                      <TableCell className="text-gray-900">{new Date(template.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell className="text-gray-900">{template.uploadedBy}</TableCell>
                       <TableCell>
                         {template.isActive ? (
@@ -651,7 +707,17 @@ export default function ContractTemplatePage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex flex-col items-center">
+                          <FileText className="w-12 h-12 text-gray-300 mb-4" />
+                          <span className="text-gray-500">No contract templates found. Upload your first template to get started.</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
