@@ -156,7 +156,18 @@ export default function ContractGeneratePage() {
         throw new Error(errorData.message || 'Failed to generate contract');
       }
       
-      return await response.json();
+      // Download the generated contract file
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `contract_${data.employeeId}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
     },
     onSuccess: (result) => {
       toast({
