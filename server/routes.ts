@@ -245,45 +245,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Convert base64 template content back to binary
       const templateBuffer = Buffer.from(templateContent, 'base64');
-
-      // Import mammoth for DOCX processing
-      const mammoth = await import('mammoth');
       
-      // Convert DOCX to HTML
-      const result = await mammoth.convertToHtml({ buffer: templateBuffer });
-      let htmlContent = result.value;
+      // Try to determine if this is a DOCX file or plain text
+      let htmlContent = '';
+      
+      // Check if the buffer starts with DOCX file signature (PK)
+      const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
+      
+      if (isDocxFile) {
+        try {
+          const mammoth = await import('mammoth');
+          const result = await mammoth.convertToHtml({ buffer: templateBuffer });
+          htmlContent = result.value;
+        } catch (error) {
+          htmlContent = templateBuffer.toString('utf-8');
+        }
+      } else {
+        htmlContent = templateBuffer.toString('utf-8');
+      }
 
       // Create variable mapping from employee data
       const variables = {
         // Employee variables
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        fullName: `${employee.firstName} ${employee.lastName}`,
-        email: employee.email,
+        firstName: employee.firstName || '',
+        lastName: employee.lastName || '',
+        fullName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+        email: employee.email || '',
         phone: employee.phone || '',
         address: employee.address || '',
         dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : '',
+        nationalInsuranceNumber: employee.nationalInsuranceNumber || '',
+        gender: employee.gender || '',
+        maritalStatus: employee.maritalStatus || '',
+        emergencyContactName: employee.emergencyContactName || '',
+        emergencyContactPhone: employee.emergencyContactPhone || '',
+        emergencyContactRelationship: employee.emergencyContactRelationship || '',
+        passportNumber: employee.passportNumber || '',
+        passportIssueDate: employee.passportIssueDate ? new Date(employee.passportIssueDate).toLocaleDateString() : '',
+        passportExpiryDate: employee.passportExpiryDate ? new Date(employee.passportExpiryDate).toLocaleDateString() : '',
+        visaIssueDate: employee.visaIssueDate ? new Date(employee.visaIssueDate).toLocaleDateString() : '',
+        visaExpiryDate: employee.visaExpiryDate ? new Date(employee.visaExpiryDate).toLocaleDateString() : '',
+        visaCategory: employee.visaCategory || '',
+        dbsCertificateNumber: employee.dbsCertificateNumber || '',
         
         // Employment variables
-        jobTitle: employee.employment.jobTitle,
-        department: employee.employment.department,
-        manager: employee.employment.manager || 'Management',
-        employmentType: employee.employment.employmentType,
-        baseSalary: employee.employment.baseSalary || '0',
-        payFrequency: employee.employment.payFrequency || '',
-        startDate: employee.employment.startDate ? new Date(employee.employment.startDate).toLocaleDateString() : '',
-        endDate: employee.employment.endDate ? new Date(employee.employment.endDate).toLocaleDateString() : '',
-        location: employee.employment.location || '',
-        status: employee.employment.status || 'active',
+        jobTitle: employee.employment?.jobTitle || '',
+        department: employee.employment?.department || '',
+        manager: employee.employment?.manager || 'Management',
+        employmentStatus: employee.employment?.employmentStatus || '',
+        baseSalary: employee.employment?.baseSalary || '0',
+        payFrequency: employee.employment?.payFrequency || '',
+        startDate: employee.employment?.startDate ? new Date(employee.employment.startDate).toLocaleDateString() : '',
+        endDate: employee.employment?.endDate ? new Date(employee.employment.endDate).toLocaleDateString() : '',
+        location: employee.employment?.location || '',
+        weeklyHours: employee.employment?.weeklyHours || '',
+        paymentMethod: employee.employment?.paymentMethod || '',
+        taxCode: employee.employment?.taxCode || '',
+        benefits: employee.employment?.benefits ? employee.employment.benefits.join(', ') : '',
+        status: employee.employment?.status || 'active',
         
         // Company variables
-        companyName: employee.company.name,
-        companyAddress: employee.company.address || '',
-        companyPhone: employee.company.phone || '',
-        companyEmail: employee.company.email || '',
-        companyWebsite: employee.company.website || '',
-        companyIndustry: employee.company.industry || '',
-        companySize: employee.company.size || '',
+        companyName: employee.company?.name || '',
+        companyAddress: employee.company?.address || '',
+        companyPhone: employee.company?.phone || '',
+        companyEmail: employee.company?.email || '',
+        companyWebsite: employee.company?.website || '',
+        companyIndustry: employee.company?.industry || '',
+        companySize: employee.company?.size || '',
         
         // Additional formatted variables
         currentDate: new Date().toLocaleDateString(),
@@ -292,15 +320,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Replace variables in HTML content using {{variableName}} pattern
       Object.entries(variables).forEach(([key, value]) => {
-        const patterns = [
-          new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
-          new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
-          new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
-        ];
+        if (typeof key !== 'string') return;
         
-        patterns.forEach(pattern => {
-          htmlContent = htmlContent.replace(pattern, value.toString());
-        });
+        try {
+          const patterns = [
+            new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
+            new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
+            new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
+          ];
+          
+          patterns.forEach(pattern => {
+            if (value !== undefined && value !== null) {
+              htmlContent = htmlContent.replace(pattern, value.toString());
+            } else {
+              htmlContent = htmlContent.replace(pattern, '');
+            }
+          });
+        } catch (error) {
+          // Skip problematic keys silently
+        }
       });
 
       // Convert HTML back to DOCX
@@ -355,7 +393,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.setHeader('Content-Disposition', `attachment; filename="${employee.firstName}_${employee.lastName}_Contract.docx"`);
       res.send(buffer);
     } catch (error) {
-      res.status(500).json({ message: "Failed to generate contract" });
+      console.error('Contract generation error:', error);
+      res.status(500).json({ message: "Failed to generate contract", error: error.message });
     }
   });
 

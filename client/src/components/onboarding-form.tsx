@@ -162,7 +162,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
               description: "The new employee and their employment contract have been generated automatically.",
             });
             // Invalidate contracts query to refresh the contracts page
-            queryClient.invalidateQueries({ queryKey: ['/api/companies', data.companyId, 'contracts'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/companies', employeeData.companyId, 'contracts'] });
           }
         } else {
           toast({
@@ -180,7 +180,7 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       
       // Invalidate both companies and employees queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/companies', data.companyId, 'employees'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', employeeData.companyId, 'employees'] });
       onStepChange(totalSteps + 1); // Move to success step
     },
     onError: (error: any) => {
