@@ -253,6 +253,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Employee variables
         firstName: employee.firstName || '',
         lastName: employee.lastName || '',
+        // Specific mappings as requested
+        employeeFirstName: employee.firstName || '',
+        employeeLastName: employee.lastName || '',
         fullName: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
         email: employee.email || '',
         phone: employee.phone || '',
@@ -311,11 +314,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if this is a DOCX file and use docx-templates for proper variable replacement
       const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
       
+      console.log('Processing contract template:');
+      console.log('- Template is DOCX file:', isDocxFile);
+      console.log('- Template buffer size:', templateBuffer.length);
+      console.log('- Available variables:', Object.keys(variables));
+      
       let buffer;
       if (isDocxFile) {
         // Use docx-templates for proper DOCX variable replacement with formatting preservation
         try {
+          console.log('Using docx-templates for variable replacement...');
           const { createReport } = await import('docx-templates');
+          
+          // Create report with better error handling
           buffer = await createReport({
             template: templateBuffer,
             data: variables,
@@ -324,13 +335,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
               formatDate: (date) => date ? new Date(date).toLocaleDateString() : '',
               formatCurrency: (amount) => amount ? `£${parseFloat(amount).toLocaleString()}` : '',
             },
+            // Configure delimiters for {{variableName}} syntax
+            cmdDelimiter: ['{{', '}}'],
+            // Add some processing options
+            processLineBreaks: true,
           });
+          
+          console.log('docx-templates processing completed successfully');
+          console.log('Output buffer size:', buffer.length);
+          
         } catch (error) {
           console.error('Error using docx-templates:', error);
+          console.error('Error stack:', error.stack);
+          console.log('Falling back to simple text replacement...');
+          
           // Fallback to simple text replacement if docx-templates fails
           buffer = await fallbackTextReplacement(templateBuffer, variables);
         }
       } else {
+        console.log('Using simple text replacement for non-DOCX file...');
         // For non-DOCX files, use simple text replacement
         buffer = await fallbackTextReplacement(templateBuffer, variables);
       }
