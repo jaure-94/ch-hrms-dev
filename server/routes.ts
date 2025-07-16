@@ -291,16 +291,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         benefits: employee.employment?.benefits ? employee.employment.benefits.join(', ') : '',
         status: employee.employment?.status || 'active',
         
-        // Company variables
+        // Company variables - Parse address properly for UK format
         companyName: employee.company?.name || '',
         companyAddress: employee.company?.address || '',
-        companyAddressStreet1: employee.company?.address?.split('\n')[0] || '',
-        companyAddressStreet2: employee.company?.address?.split('\n')[1] || '',
+        companyAddressStreet1: (() => {
+          const addressLines = employee.company?.address?.split('\n') || [];
+          return addressLines[0] || '';
+        })(),
+        companyAddressStreet2: (() => {
+          const addressLines = employee.company?.address?.split('\n') || [];
+          return addressLines[1] || '';
+        })(),
         companyPhone: employee.company?.phone || '',
         companyEmail: employee.company?.email || '',
         companyWebsite: employee.company?.website || '',
         companyIndustry: employee.company?.industry || '',
         companySize: employee.company?.size || '',
+        
+        // Additional company address variables (parsed from single address field)
+        companyAddressCity: (() => {
+          const address = employee.company?.address || '';
+          // Try to extract city from address patterns like "City, County" or "City, PostCode"
+          const cityMatch = address.match(/([^,\n]+),\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\w+\s*\d)/);
+          return cityMatch ? cityMatch[1].trim() : 'London';
+        })(),
+        comanyAddressCity: (() => {
+          // Handle typo in template - same logic as above
+          const address = employee.company?.address || '';
+          const cityMatch = address.match(/([^,\n]+),\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}|\w+\s*\d)/);
+          return cityMatch ? cityMatch[1].trim() : 'London';
+        })(),
+        companyAddressPostcode: (() => {
+          const address = employee.company?.address || '';
+          // Extract UK postcode pattern
+          const postcodeMatch = address.match(/([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})/);
+          return postcodeMatch ? postcodeMatch[1].trim() : 'SW1A 1AA';
+        })(),
+        companyAddressCountry: 'United Kingdom',
+        companyAddressCounty: (() => {
+          const address = employee.company?.address || '';
+          // Try to extract county or state from address
+          const countyMatch = address.match(/,\s*([^,\n]+),\s*([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})/);
+          return countyMatch ? countyMatch[1].trim() : 'Greater London';
+        })(),
         
         // Additional formatted variables
         currentDate: new Date().toLocaleDateString(),
@@ -311,6 +344,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         contractDate: contractDate || new Date().toLocaleDateString(),
         probationPeriod: probationPeriod || '',
         employeeAddress: employee.address || '',
+        
+        // Common template variables with variations
+        employee_first_name: employee.firstName || '',
+        employee_last_name: employee.lastName || '',
+        employee_full_name: `${employee.firstName || ''} ${employee.lastName || ''}`.trim(),
+        employee_email: employee.email || '',
+        employee_phone: employee.phone || '',
+        employee_address: employee.address || '',
+        
+        // Job-related variables
+        job_title: employee.employment?.jobTitle || '',
+        employment_start_date: employee.employment?.startDate ? new Date(employee.employment.startDate).toLocaleDateString() : '',
+        employment_end_date: employee.employment?.endDate ? new Date(employee.employment.endDate).toLocaleDateString() : '',
+        salary: employee.employment?.baseSalary || '0',
+        annual_salary: employee.employment?.baseSalary || '0',
+        base_salary: employee.employment?.baseSalary || '0',
+        
+        // Company info variations
+        company_name: employee.company?.name || '',
+        company_address: employee.company?.address || '',
+        company_city: employee.company?.city || 'London',
+        company_postcode: employee.company?.postcode || '',
+        company_country: employee.company?.country || 'United Kingdom',
       };
 
       // Check if this is a DOCX file and use docx-templates for proper variable replacement
@@ -320,6 +376,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('- Template is DOCX file:', isDocxFile);
       console.log('- Template buffer size:', templateBuffer.length);
       console.log('- Available variables:', Object.keys(variables));
+      console.log('- Sample variable values:', {
+        firstName: variables.firstName,
+        lastName: variables.lastName,
+        companyName: variables.companyName,
+        companyAddressCity: variables.companyAddressCity,
+        comanyAddressCity: variables.comanyAddressCity,
+        jobTitle: variables.jobTitle,
+        baseSalary: variables.baseSalary
+      });
       
       let buffer;
       if (isDocxFile) {
