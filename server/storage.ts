@@ -243,8 +243,10 @@ export class DatabaseStorage implements IStorage {
     // First, set all templates for this company to inactive
     await db.update(contractTemplates).set({ isActive: false }).where(eq(contractTemplates.companyId, companyId));
     
-    // Then, set the specified template as active
-    await db.update(contractTemplates).set({ isActive: true }).where(and(eq(contractTemplates.id, templateId), eq(contractTemplates.companyId, companyId)));
+    // Then, set the specified template as active (only if templateId is not empty)
+    if (templateId) {
+      await db.update(contractTemplates).set({ isActive: true }).where(and(eq(contractTemplates.id, templateId), eq(contractTemplates.companyId, companyId)));
+    }
   }
 
   async getContract(id: string): Promise<Contract | undefined> {

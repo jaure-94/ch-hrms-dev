@@ -1,9 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCompanySchema, insertEmployeeSchema, insertEmploymentSchema } from "@shared/schema";
+import { insertCompanySchema, insertEmployeeSchema, insertEmploymentSchema, contractTemplates } from "@shared/schema";
 import { z } from "zod";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 const employeeFormSchema = z.object({
   // Personal Information
@@ -476,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // First, deactivate all existing templates for this company
-      await storage.setActiveContractTemplate(req.params.companyId, "");
+      await db.update(contractTemplates).set({ isActive: false }).where(eq(contractTemplates.companyId, req.params.companyId));
 
       const template = await storage.createContractTemplate({
         companyId: req.params.companyId,
@@ -491,7 +493,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.status(201).json(template);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create contract template" });
+      console.error("Error creating contract template:", error);
+      res.status(500).json({ message: "Failed to create contract template", error: error.message });
     }
   });
 
