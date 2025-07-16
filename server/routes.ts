@@ -367,6 +367,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         company_city: employee.company?.city || 'London',
         company_postcode: employee.company?.postcode || '',
         company_country: employee.company?.country || 'United Kingdom',
+        
+        // Additional common template variables
+        vacationWeeks: '4', // Standard UK vacation weeks
+        vacationDays: '20', // Standard UK vacation days (4 weeks x 5 days)
+        workingDays: '5', // Standard working days per week
+        workingWeeks: '52', // Standard working weeks per year
+        pensionContribution: '3%', // UK minimum pension contribution
+        sickLeave: '28 weeks', // UK statutory sick leave
+        maternityLeave: '52 weeks', // UK maternity leave
+        paternityLeave: '2 weeks', // UK paternity leave
+        
+        // Legal and compliance variables
+        minimumWage: '10.42', // UK minimum wage per hour
+        livingWage: '12.00', // UK living wage per hour
+        employerReference: employee.company?.name || '',
+        hrContact: employee.company?.email || '',
+        tribunalJurisdiction: 'England and Wales',
+        
+        // Benefits and perks
+        healthInsurance: 'Included',
+        lifeInsurance: 'Included',
+        dentalCare: 'Optional',
+        gymMembership: 'Optional',
+        companyPhone: 'Optional',
+        companyLaptop: 'Provided',
+        parkingSpace: 'Available',
+        workFromHome: 'Hybrid',
       };
 
       // Check if this is a DOCX file and use docx-templates for proper variable replacement
@@ -432,15 +459,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (isDocxFile) {
           console.log('Fallback: Template is DOCX, attempting simple variable replacement...');
-          
-          // For DOCX files, try to do simple binary replacement of variables
-          // This is a basic approach that preserves the DOCX structure
-          let content = templateBuffer;
+          console.log('Fallback: Available variables:', Object.keys(variables));
           
           // Convert buffer to string for replacement, then back to buffer
           let contentStr = templateBuffer.toString('binary');
           
+          // Check what variables are actually in the template
+          const foundVariables = contentStr.match(/\{\{[^}]+\}\}/g);
+          console.log('Fallback: Variables found in template:', foundVariables ? foundVariables.slice(0, 20) : 'none');
+          
           // Replace variables using {{variableName}} pattern
+          let replacements = 0;
           Object.entries(variables).forEach(([key, value]) => {
             if (typeof key !== 'string') return;
             
@@ -452,10 +481,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
               ];
               
               patterns.forEach(pattern => {
-                if (value !== undefined && value !== null) {
-                  contentStr = contentStr.replace(new RegExp(pattern, 'g'), value.toString());
-                } else {
-                  contentStr = contentStr.replace(new RegExp(pattern, 'g'), '');
+                // Simple string replacement without regex for more reliable matching
+                const beforeCount = (contentStr.match(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+                
+                if (beforeCount > 0) {
+                  console.log(`Fallback: Found ${beforeCount} instances of ${pattern}, replacing with "${value}"`);
+                  replacements += beforeCount;
+                  
+                  if (value !== undefined && value !== null) {
+                    // Use simple string replacement for better reliability
+                    contentStr = contentStr.split(pattern).join(value.toString());
+                  } else {
+                    contentStr = contentStr.split(pattern).join('');
+                  }
                 }
               });
             } catch (error) {
@@ -463,7 +501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           });
 
-          console.log('Fallback: Variable replacement completed');
+          console.log(`Fallback: Variable replacement completed - ${replacements} total replacements made`);
           return Buffer.from(contentStr, 'binary');
         } else {
           console.log('Fallback: Template is not DOCX, creating new document...');
@@ -533,12 +571,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         probationPeriod: probationPeriod || null,
       };
 
-      await storage.createContract(contractData);
+      const contract = await storage.createContract(contractData);
       
-      // Send the generated contract file
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-      res.setHeader('Content-Disposition', `attachment; filename="${employee.firstName}_${employee.lastName}_Contract.docx"`);
-      res.send(buffer);
+      // Return success response instead of downloading file
+      res.json({ 
+        success: true, 
+        message: "Contract generated successfully",
+        contractId: contract.id,
+        fileName: `${employee.firstName}_${employee.lastName}_Contract.docx`
+      });
     } catch (error) {
       console.error('Contract generation error:', error);
       res.status(500).json({ message: "Failed to generate contract", error: error.message });
