@@ -1,0 +1,37 @@
+EMPLOYMENT CONTRACT
+
+This Employment Contract ("Contract") is entered into between {{companyName}} ("Company") and {{fullName}} ("Employee") on {{currentDate}}.
+
+EMPLOYEE INFORMATION:
+Name: {{fullName}}
+Email: {{email}}
+Phone: {{phone}}
+Address: {{address}}
+
+EMPLOYMENT DETAILS:
+Position: {{jobTitle}}
+Department: {{department}}
+Start Date: {{startDate}}
+Location: {{location}}
+Manager: {{manager}}
+
+COMPENSATION:
+Base Salary: £{{baseSalary}} per {{payFrequency}}
+Payment Method: {{paymentMethod}}
+
+TERMS AND CONDITIONS:
+1. This contract is effective from {{startDate}} and continues until terminated by either party.
+2. The Employee agrees to work {{weeklyHours}} hours per week.
+3. The Employee will be based at {{location}}.
+4. The Employee reports to {{manager}}.
+
+COMPANY INFORMATION:
+Company Name: {{companyName}}
+Company Address: {{companyAddress}}
+
+This contract is governed by the laws of the United Kingdom.
+
+Signed on {{currentDate}}
+
+Employee: {{fullName}}
+Company: {{companyName}}

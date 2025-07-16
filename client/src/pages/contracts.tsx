@@ -9,11 +9,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw, Settings } from "lucide-react";
 import { Link } from "wouter";
 import PageHeader from "@/components/page-header";
+import ContractViewModal from "@/components/contract-view-modal";
 
 export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [selectedContract, setSelectedContract] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
@@ -33,6 +36,16 @@ export default function Contracts() {
       contract.templateName?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesDepartment && matchesStatus && matchesSearch;
   }) || [];
+
+  const handleViewContract = (contract: any) => {
+    setSelectedContract(contract);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedContract(null);
+  };
 
   const handleDownloadContract = async (contractId: string) => {
     try {
@@ -230,7 +243,12 @@ export default function Contracts() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-2">
-                          <Button variant="ghost" size="sm" title="View Details">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            title="View Details"
+                            onClick={() => handleViewContract(contract)}
+                          >
                             <Eye className="w-4 h-4" />
                           </Button>
                           <Button variant="ghost" size="sm" title="Edit Contract">
@@ -262,6 +280,14 @@ export default function Contracts() {
           </CardContent>
         </Card>
       </main>
+
+      {/* Contract View Modal */}
+      <ContractViewModal
+        contract={selectedContract}
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onDownload={handleDownloadContract}
+      />
     </div>
   );
 }
