@@ -57,10 +57,11 @@ export default function ContractGeneratePage() {
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
-  const { data: employees, isLoading: employeesLoading } = useQuery({
-    queryKey: ['/api/companies', companyId, 'employees'],
+  const { data: employees, isLoading: employeesLoading, error: employeesError } = useQuery({
+    queryKey: [`/api/companies/${companyId}/employees`],
     enabled: !!companyId,
   });
+
 
   const form = useForm<ContractFormData>({
     resolver: zodResolver(contractFormSchema),
@@ -72,7 +73,7 @@ export default function ContractGeneratePage() {
       baseSalary: "",
       payFrequency: "monthly",
       startDate: "",
-      endDate: "",
+      endDate: undefined,
       contractType: "permanent",
       location: "",
       hoursPerWeek: "40",
@@ -334,7 +335,7 @@ export default function ContractGeneratePage() {
                           <FormControl>
                             <Input {...field} placeholder="e.g., 75000" />
                           </FormControl>
-                          <FormDescription>Enter amount in USD</FormDescription>
+                          <FormDescription>Enter amount in GBP (£)</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
