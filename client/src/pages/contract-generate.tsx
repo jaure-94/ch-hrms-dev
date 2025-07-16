@@ -94,10 +94,28 @@ export default function ContractGeneratePage() {
       form.setValue("department", employee.employment?.department || "");
       form.setValue("manager", employee.employment?.manager || "");
       form.setValue("baseSalary", employee.employment?.baseSalary || "");
-      form.setValue("payFrequency", employee.employment?.payFrequency || "monthly");
-      form.setValue("startDate", employee.employment?.startDate || "");
+      
+      // Map database pay frequency values to form values
+      const payFreqMap: { [key: string]: string } = {
+        "Annual": "annually",
+        "Monthly": "monthly", 
+        "Bi-Weekly": "bi-weekly",
+        "Weekly": "weekly"
+      };
+      const dbPayFreq = employee.employment?.payFrequency || "Monthly";
+      form.setValue("payFrequency", payFreqMap[dbPayFreq] || "monthly");
+      
+      form.setValue("startDate", employee.employment?.startDate?.split('T')[0] || "");
       form.setValue("location", employee.employment?.location || "");
       form.setValue("hoursPerWeek", employee.employment?.weeklyHours || "40");
+      
+      // Auto-populate benefits if available
+      const benefits = employee.employment?.benefits;
+      if (benefits && Array.isArray(benefits)) {
+        form.setValue("benefits", benefits.join(", "));
+      } else {
+        form.setValue("benefits", "");
+      }
     }
   };
 
