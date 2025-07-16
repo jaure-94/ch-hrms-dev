@@ -1,4 +1,4 @@
-import { pgTable, text, serial, uuid, timestamp, decimal, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, uuid, timestamp, decimal, boolean, jsonb, integer } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -71,6 +71,9 @@ export const contracts = pgTable("contracts", {
   templateName: text("template_name").notNull(),
   fileName: text("file_name").notNull(),
   fileContent: text("file_content").notNull(), // Base64 encoded file content
+  noticeWeeks: integer("notice_weeks"),
+  contractDate: timestamp("contract_date"),
+  probationPeriod: text("probation_period"),
   status: text("status").default("active"), // active, archived, expired
   generatedAt: timestamp("generated_at").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),

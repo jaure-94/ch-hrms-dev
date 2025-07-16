@@ -45,6 +45,8 @@ const contractFormSchema = z.object({
   benefits: z.string().optional(),
   specialTerms: z.string().optional(),
   probationPeriod: z.string().optional(),
+  noticeWeeks: z.string().optional(),
+  contractDate: z.string().optional(),
 });
 
 type ContractFormData = z.infer<typeof contractFormSchema>;
@@ -80,6 +82,8 @@ export default function ContractGeneratePage() {
       benefits: "",
       specialTerms: "",
       probationPeriod: "",
+      noticeWeeks: "4",
+      contractDate: new Date().toISOString().split('T')[0],
     },
   });
 
@@ -116,6 +120,14 @@ export default function ContractGeneratePage() {
       } else {
         form.setValue("benefits", "");
       }
+      
+      // Auto-populate probation period if available - this might be in employment data
+      // For now, we'll check if it's a probationary contract and set a default
+      if (employee.employment?.employmentStatus === "Probationary") {
+        form.setValue("probationPeriod", "3 months");
+      } else {
+        form.setValue("probationPeriod", "");
+      }
     }
   };
 
@@ -132,7 +144,10 @@ export default function ContractGeneratePage() {
         body: JSON.stringify({
           templateId: 'default-template',
           templateContent: defaultTemplate,
-          templateName: 'Default Employment Contract'
+          templateName: 'Default Employment Contract',
+          noticeWeeks: data.noticeWeeks ? parseInt(data.noticeWeeks) : null,
+          contractDate: data.contractDate || null,
+          probationPeriod: data.probationPeriod || null,
         }),
       });
       
@@ -178,13 +193,15 @@ export default function ContractGeneratePage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Breadcrumb */}
-      <Breadcrumb 
-        items={[
-          { label: "Contracts", href: "/contracts", icon: FileText },
-          { label: "Generate New Contract", icon: Plus }
-        ]} 
-      />
+      {/* Breadcrumb - Sticky */}
+      <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+        <Breadcrumb 
+          items={[
+            { label: "Contracts", href: "/contracts", icon: FileText },
+            { label: "Generate New Contract", icon: Plus }
+          ]} 
+        />
+      </div>
 
       {/* Header */}
       <PageHeader 
@@ -466,6 +483,46 @@ export default function ContractGeneratePage() {
                             />
                           </FormControl>
                           <FormDescription>Leave blank for permanent positions</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="contractDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contract Date</FormLabel>
+                          <FormControl>
+                            <DatePicker
+                              date={field.value ? new Date(field.value) : undefined}
+                              onDateChange={(date) => {
+                                field.onChange(date ? date.toISOString().split('T')[0] : "");
+                              }}
+                              placeholder="Select contract date"
+                              error={!!form.formState.errors.contractDate}
+                              errorMessage={form.formState.errors.contractDate?.message}
+                            />
+                          </FormControl>
+                          <FormDescription>Date when contract is signed</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={form.control}
+                      name="noticeWeeks"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notice Period (Weeks)</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g., 4" type="number" />
+                          </FormControl>
+                          <FormDescription>Number of weeks notice required</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

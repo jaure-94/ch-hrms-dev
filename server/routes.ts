@@ -237,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get the active template from request body or use localStorage approach
-      const { templateId, templateContent, templateName } = req.body;
+      const { templateId, templateContent, templateName, noticeWeeks, contractDate, probationPeriod } = req.body;
       
       if (!templateContent) {
         return res.status(400).json({ message: "No active contract template found. Please upload a template first." });
@@ -316,6 +316,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Additional formatted variables
         currentDate: new Date().toLocaleDateString(),
         currentYear: new Date().getFullYear().toString(),
+        
+        // Contract-specific variables
+        noticeWeeks: noticeWeeks || '4',
+        contractDate: contractDate || new Date().toLocaleDateString(),
+        probationPeriod: probationPeriod || '',
+        employeeAddress: employee.address || '',
       };
 
       // Replace variables in HTML content using {{variableName}} pattern
@@ -384,6 +390,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         templateName: templateName || 'Employment Contract Template',
         fileName: `${employee.firstName}_${employee.lastName}_Contract.docx`,
         fileContent: buffer.toString('base64'),
+        noticeWeeks: noticeWeeks ? parseInt(noticeWeeks) : null,
+        contractDate: contractDate ? new Date(contractDate) : null,
+        probationPeriod: probationPeriod || null,
       };
 
       await storage.createContract(contractData);
