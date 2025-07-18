@@ -396,167 +396,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workFromHome: 'Hybrid',
       };
 
-      // Check if this is a DOCX file and use docx-templates for proper variable replacement
-      const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
-      
+      // Use docx-templates for proper DOCX variable replacement with formatting preservation
       console.log('Processing contract template:');
-      console.log('- Template is DOCX file:', isDocxFile);
       console.log('- Template buffer size:', templateBuffer.length);
       console.log('- Available variables:', Object.keys(variables));
       console.log('- Sample variable values:', {
         firstName: variables.firstName,
         lastName: variables.lastName,
         companyName: variables.companyName,
-        companyAddressCity: variables.companyAddressCity,
-        comanyAddressCity: variables.comanyAddressCity,
         jobTitle: variables.jobTitle,
         baseSalary: variables.baseSalary
       });
       
       let buffer;
-      if (isDocxFile) {
-        // Use docx-templates for proper DOCX variable replacement with formatting preservation
-        try {
-          console.log('Using docx-templates for variable replacement...');
-          const { createReport } = await import('docx-templates');
-          
-          // Create report with better error handling
-          buffer = await createReport({
-            template: templateBuffer,
-            data: variables,
-            additionalJsContext: {
-              // Add any additional JavaScript context if needed
-              formatDate: (date) => date ? new Date(date).toLocaleDateString() : '',
-              formatCurrency: (amount) => amount ? `£${parseFloat(amount).toLocaleString()}` : '',
-            },
-            // Configure delimiters for {{variableName}} syntax
-            cmdDelimiter: ['{{', '}}'],
-            // Add some processing options
-            processLineBreaks: true,
-          });
-          
-          console.log('docx-templates processing completed successfully');
-          console.log('Output buffer size:', buffer.length);
-          
-        } catch (error) {
-          console.error('Error using docx-templates:', error);
-          console.error('Error stack:', error.stack);
-          console.log('Falling back to simple text replacement...');
-          
-          // Fallback to simple text replacement if docx-templates fails
-          buffer = await fallbackTextReplacement(templateBuffer, variables);
-        }
-      } else {
-        console.log('Using simple text replacement for non-DOCX file...');
-        // For non-DOCX files, use simple text replacement
-        buffer = await fallbackTextReplacement(templateBuffer, variables);
-      }
-
-      // Fallback function for text replacement - return original template if DOCX fails
-      async function fallbackTextReplacement(templateBuffer, variables) {
-        console.log('Fallback: Checking if template is DOCX...');
-        const isDocxFile = templateBuffer.length > 2 && templateBuffer[0] === 0x50 && templateBuffer[1] === 0x4B;
+      try {
+        console.log('Using docx-templates for variable replacement...');
+        const { createReport } = await import('docx-templates');
         
-        if (isDocxFile) {
-          console.log('Fallback: Template is DOCX, attempting simple variable replacement...');
-          console.log('Fallback: Available variables:', Object.keys(variables));
-          
-          // Convert buffer to string for replacement, then back to buffer
-          let contentStr = templateBuffer.toString('binary');
-          
-          // Check what variables are actually in the template
-          const foundVariables = contentStr.match(/\{\{[^}]+\}\}/g);
-          console.log('Fallback: Variables found in template:', foundVariables ? foundVariables.slice(0, 20) : 'none');
-          
-          // Replace variables using {{variableName}} pattern
-          let replacements = 0;
-          Object.entries(variables).forEach(([key, value]) => {
-            if (typeof key !== 'string') return;
-            
-            try {
-              const patterns = [
-                `{{${key}}}`,           // {{firstName}}
-                `{{${key.toLowerCase()}}}`, // {{firstname}}
-                `{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, // {{first_name}}
-              ];
-              
-              patterns.forEach(pattern => {
-                // Simple string replacement without regex for more reliable matching
-                const beforeCount = (contentStr.match(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
-                
-                if (beforeCount > 0) {
-                  console.log(`Fallback: Found ${beforeCount} instances of ${pattern}, replacing with "${value}"`);
-                  replacements += beforeCount;
-                  
-                  if (value !== undefined && value !== null) {
-                    // Use simple string replacement for better reliability
-                    contentStr = contentStr.split(pattern).join(value.toString());
-                  } else {
-                    contentStr = contentStr.split(pattern).join('');
-                  }
-                }
-              });
-            } catch (error) {
-              console.log(`Fallback: Error replacing ${key}:`, error);
-            }
-          });
-
-          console.log(`Fallback: Variable replacement completed - ${replacements} total replacements made`);
-          return Buffer.from(contentStr, 'binary');
-        } else {
-          console.log('Fallback: Template is not DOCX, creating new document...');
-          // For non-DOCX files, create a new DOCX document
-          let content = templateBuffer.toString('utf-8');
-          
-          // Replace variables using {{variableName}} pattern
-          Object.entries(variables).forEach(([key, value]) => {
-            if (typeof key !== 'string') return;
-            
-            try {
-              const patterns = [
-                new RegExp(`{{${key}}}`, 'gi'),           // {{firstName}}
-                new RegExp(`{{${key.toLowerCase()}}}`, 'gi'), // {{firstname}}
-                new RegExp(`{{${key.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')}}}`, 'gi'), // {{first_name}}
-              ];
-              
-              patterns.forEach(pattern => {
-                if (value !== undefined && value !== null) {
-                  content = content.replace(pattern, value.toString());
-                } else {
-                  content = content.replace(pattern, '');
-                }
-              });
-            } catch (error) {
-              // Skip problematic keys silently
-            }
-          });
-
-          // Create new DOCX document with processed content
-          const Document = (await import('docx')).Document;
-          const Packer = (await import('docx')).Packer;
-          const Paragraph = (await import('docx')).Paragraph;
-          const TextRun = (await import('docx')).TextRun;
-
-          const doc = new Document({
-            sections: [
-              {
-                properties: {},
-                children: content.split('\n').filter(line => line.trim()).map(line => 
-                  new Paragraph({
-                    children: [
-                      new TextRun({
-                        text: line,
-                      }),
-                    ],
-                  })
-                ),
-              },
-            ],
-          });
-
-          return await Packer.toBuffer(doc);
-        }
+        // Convert template buffer to Uint8Array as required by docx-templates
+        const templateArray = new Uint8Array(templateBuffer);
+        
+        // Create report with proper configuration
+        buffer = await createReport({
+          template: templateArray,
+          data: {
+            ...variables,
+            currentDate: new Date().toLocaleDateString('en-GB'),
+            currentYear: new Date().getFullYear().toString()
+          },
+          // Use {{ }} delimiters as shown in the reference implementation
+          cmdDelimiter: ['{{', '}}'],
+          processLineBreaks: true,
+        });
+        
+        console.log('docx-templates processing completed successfully');
+        console.log('Output buffer size:', buffer.length);
+        
+      } catch (error) {
+        console.error('Error using docx-templates:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+        
+        // Return error instead of fallback
+        throw new Error(`Failed to process contract template: ${error.message}`);
       }
+
+
 
       // Save contract to database
       const contractData = {

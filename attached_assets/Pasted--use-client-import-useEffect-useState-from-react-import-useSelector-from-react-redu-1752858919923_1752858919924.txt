@@ -1,0 +1,132 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
+import { RootState } from '@/lib/store'
+import { createReport } from 'docx-templates'
+import { saveAs } from 'file-saver'
+import { useForm } from 'react-hook-form'
+
+const DocxTemplateForm = () => {
+  const { register } = useForm()
+  const employeeData = useSelector((state: RootState) => state.employee.data)
+  const [ isGenerating, setIsGenerating ] = useState<boolean>(false)
+  const [ templateFile, setTemplateFile ] = useState<File | null>(null)
+  const [ downloadUrl, setDownloadUrl ] = useState<string | null>(null)
+
+  const parsedData = employeeData ? JSON.parse(employeeData) : null
+
+  useEffect(() => {
+    const loadDefaultTemplate = async () => {
+      try {
+        const response = await fetch('././files/employee-template.docx')
+        const blob = await response.blob()
+        const file = new File([blob], 'default-template.docx', { type: blob.type })
+        setTemplateFile(file)
+      } catch (error) {
+        console.warn('Could not load default template:', error)
+      }
+    }
+
+    loadDefaultTemplate()
+  }, [ setTemplateFile ])
+
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setTemplateFile(e.target.files[0]);
+      setDownloadUrl(null); // Reset download URL when template changes
+    }
+  }
+
+  const generateDocument = async () => {
+    if (!templateFile || !parsedData) {
+      alert('Please upload a template and ensure customer data is available.');
+      return;
+    }
+
+    setIsGenerating(true)
+    setDownloadUrl(null)
+
+    try {
+      const templateBuffer = await templateFile.arrayBuffer()
+      const uint8Array = new Uint8Array(templateBuffer) as Uint8Array
+
+      const report = await createReport({
+        template: uint8Array,
+        data: {
+          ...parsedData,
+          currentDate: new Date().toLocaleDateString()
+        },
+        cmdDelimiter: ['{{', '}}']
+      })
+
+      const blob = new Blob([report], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      setDownloadUrl(url)
+
+      saveAs(blob, `employee-document-${Date.now()}.docx`)
+    } catch (error) {
+      console.error('Error generating document:', error)
+      alert('Failed to generate document. Please check the template format.')
+    } finally {
+      setIsGenerating(true)
+    }
+  }
+
+  return (
+    <div className="flex flex-col min-h-screen h-screen">
+      <div className="flex flex-col p-4 gap-5 bg-apryse-blue justify-between w-full align-middle">
+        <h1 className="text-xl font-bold align-middle">
+          Document Template Generator
+        </h1>
+
+        <div>
+          <label htmlFor="">Word Template File</label>
+          <input
+            type="file"
+            accept=".docx"
+            onChange={handleTemplateChange}
+            className="w-full px-3 py-2 border-2 border-stone-400 rounded-lg"
+          />
+          <p>
+            {templateFile ? `Selected: ${templateFile.name}` : 'No template selected'}
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <h3 className="font-semibold mb-2">Data to be inserted:</h3>
+          <pre className="bg-white p-3 rounded text-sm overflow-auto max-h-40">
+            {JSON.stringify(parsedData, null)}
+          </pre>
+        </div>
+
+        <button
+          onClick={generateDocument}
+          disabled={isGenerating || !templateFile}
+          className={`py-2 px-4 rounded text-white ${
+            isGenerating || !templateFile
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-green-600 hover:bg-green-700'
+          }`}
+        >
+          {isGenerating ? "Generating..." : "Generate Document"}
+        </button>
+
+        {downloadUrl && (
+          <div className="mt-4 p-3 bg-blue-50 rounded">
+            <p className="text-blue-800">Document generated successfully!</p>
+            <a 
+              href={downloadUrl}
+              download={`customer-document-${Date.now()}.docx`}
+              className="text-blue-600 underline mt-2 inline-block"
+            >
+              Download
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default DocxTemplateForm
