@@ -247,6 +247,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Convert base64 template content back to binary
       const templateBuffer = Buffer.from(templateContent, 'base64');
+      
+      // Basic validation - check if it's a valid DOCX file (should start with PK)
+      if (!templateBuffer || templateBuffer.length < 4) {
+        return res.status(400).json({ message: "Invalid template file: file is too small" });
+      }
+      
+      // Check for ZIP/DOCX file signature (PK)
+      if (templateBuffer[0] !== 0x50 || templateBuffer[1] !== 0x4B) {
+        return res.status(400).json({ message: "Invalid template file: not a valid DOCX file" });
+      }
 
       // Create variable mapping from employee data
       const variables = {
@@ -430,12 +440,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('Using docx-templates for variable replacement...');
         const { createReport } = await import('docx-templates');
         
-        // Convert template buffer to Uint8Array as required by docx-templates
-        const templateArray = new Uint8Array(templateBuffer);
-        
         // Create report with proper configuration
         buffer = await createReport({
-          template: templateArray,
+          template: templateBuffer,
           data: {
             ...variables,
             currentDate: new Date().toLocaleDateString('en-GB'),
@@ -447,7 +454,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         
         console.log('docx-templates processing completed successfully');
-        console.log('Output buffer size:', buffer.length);
+        console.log('Output buffer type:', typeof buffer);
+        console.log('Output buffer length:', buffer ? buffer.length : 'undefined');
+        console.log('Is buffer a Buffer?', Buffer.isBuffer(buffer));
+        console.log('Is buffer a Uint8Array?', buffer instanceof Uint8Array);
+        
+        // Ensure we have a proper Buffer for further processing
+        if (!(buffer instanceof Buffer)) {
+          if (buffer instanceof Uint8Array) {
+            buffer = Buffer.from(buffer);
+            console.log('Converted Uint8Array to Buffer');
+          } else {
+            throw new Error('Unexpected buffer type returned from docx-templates');
+          }
+        }
         
       } catch (error) {
         console.error('Error using docx-templates:', error);
@@ -459,6 +479,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
 
+
+      // Validate the generated buffer
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Generated document is empty');
+      }
+      
+      // Validate that the generated buffer is still a valid DOCX
+      if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
+        throw new Error('Generated document is not a valid DOCX file');
+      }
+      
+      console.log('Final validation passed - buffer is valid DOCX');
 
       // Save contract to database
       const contractData = {
@@ -474,6 +506,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const contract = await storage.createContract(contractData);
+      
+      console.log('Contract saved to database with ID:', contract.id);
       
       // Return success response instead of downloading file
       res.json({ 
@@ -518,10 +552,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const buffer = Buffer.from(contract.fileContent, 'base64');
+      
+      // Debug logging
+      console.log('Download contract debug info:');
+      console.log('- Contract ID:', contract.id);
+      console.log('- Original base64 length:', contract.fileContent.length);
+      console.log('- Decoded buffer length:', buffer.length);
+      console.log('- Buffer first 4 bytes:', buffer.slice(0, 4));
+      console.log('- Is valid DOCX signature?', buffer[0] === 0x50 && buffer[1] === 0x4B);
+      
+      // Validate the buffer is a valid DOCX
+      if (buffer.length === 0) {
+        console.error('Buffer is empty');
+        return res.status(500).json({ message: "Contract file is empty" });
+      }
+      
+      if (buffer[0] !== 0x50 || buffer[1] !== 0x4B) {
+        console.error('Invalid DOCX signature, first 4 bytes:', buffer.slice(0, 4));
+        return res.status(500).json({ message: "Contract file is corrupted" });
+      }
+      
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
       res.setHeader('Content-Disposition', `attachment; filename="${contract.fileName}"`);
+      res.setHeader('Content-Length', buffer.length.toString());
       res.send(buffer);
     } catch (error) {
+      console.error('Download contract error:', error);
       res.status(500).json({ message: "Failed to download contract" });
     }
   });
