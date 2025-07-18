@@ -371,6 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Additional common template variables
         vacationWeeks: '4', // Standard UK vacation weeks
         vacationDays: '20', // Standard UK vacation days (4 weeks x 5 days)
+        sickDays: '28 weeks', // UK statutory sick leave (alternative name)
         workingDays: '5', // Standard working days per week
         workingWeeks: '52', // Standard working weeks per year
         pensionContribution: '3%', // UK minimum pension contribution
@@ -394,6 +395,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyLaptop: 'Provided',
         parkingSpace: 'Available',
         workFromHome: 'Hybrid',
+        
+        // Additional variables that templates might expect
+        annualLeave: '20 days',
+        publicHolidays: '8 days',
+        noticePeriod: noticeWeeks ? `${noticeWeeks} weeks` : '4 weeks',
+        probationary: probationPeriod || '3 months',
+        workingHours: employee.employment?.weeklyHours ? `${employee.employment.weeklyHours} hours per week` : '40 hours per week',
+        overtimeRate: '1.5x normal rate',
+        trainingAllowance: '£1,000 per year',
+        uniformAllowance: 'As required',
+        travelAllowance: 'As per company policy',
+        
+        // Contract specific dates
+        contractStartDate: employee.employment?.startDate ? new Date(employee.employment.startDate).toLocaleDateString('en-GB') : '',
+        contractEndDate: employee.employment?.endDate ? new Date(employee.employment.endDate).toLocaleDateString('en-GB') : 'Permanent',
+        reviewDate: employee.employment?.startDate ? new Date(new Date(employee.employment.startDate).getTime() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB') : '',
       };
 
       // Use docx-templates for proper DOCX variable replacement with formatting preservation
