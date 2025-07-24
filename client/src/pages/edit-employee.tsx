@@ -15,8 +15,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Save, User, Briefcase, FileText, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Save, User, Briefcase, FileText, AlertTriangle, Users } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 
 // Form schema - reusing the same schema from onboarding
 const employeeFormSchema = z.object({
@@ -294,6 +295,12 @@ export default function EditEmployee() {
 
   return (
     <div className="flex flex-col h-full">
+      <Breadcrumb 
+        items={[
+          { label: "Employees", href: "/employees", icon: Users },
+          { label: `Edit ${employee.firstName} ${employee.lastName}`, icon: User }
+        ]}
+      />
       <PageHeader 
         title={`Edit Employee: ${employee.firstName} ${employee.lastName}`}
         description="Update employee personal, visa, and employment information"

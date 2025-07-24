@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import { Search, Download, Plus, Eye, Edit, FileText } from "lucide-react";
+import { Search, Download, Plus, Eye, Edit, FileText, Users } from "lucide-react";
 import EmployeeTable from "@/components/employee-table";
 import { Link } from "wouter";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 
 export default function Employees() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +64,11 @@ export default function Employees() {
 
   return (
     <div className="flex flex-col h-full">
+      <Breadcrumb 
+        items={[
+          { label: "Employees", icon: Users }
+        ]}
+      />
       <PageHeader 
         title="Employee Directory"
         description="Manage your organization's employees"

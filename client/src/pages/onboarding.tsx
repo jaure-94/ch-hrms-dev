@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, ArrowRight, Download, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Plus, UserPlus } from "lucide-react";
 import OnboardingForm from "@/components/onboarding-form";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 
 export default function Onboarding() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -21,6 +22,11 @@ export default function Onboarding() {
 
   return (
     <div className="flex flex-col h-full">
+      <Breadcrumb 
+        items={[
+          { label: "Onboarding", icon: UserPlus }
+        ]}
+      />
       <PageHeader 
         title="Employee Onboarding"
         description="Add new employees to your organization"

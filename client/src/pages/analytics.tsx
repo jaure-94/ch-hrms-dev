@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, Download, BarChart, Activity, User, Clock, Shield, FileText, Filter } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 
 interface ActionLog {
   id: string;
@@ -201,6 +202,11 @@ export default function Analytics() {
 
   return (
     <div className="flex flex-col h-full">
+      <Breadcrumb 
+        items={[
+          { label: "Analytics", icon: BarChart }
+        ]}
+      />
       <PageHeader 
         title="Analytics & Audit Logs"
         description="Monitor system activity and user actions"

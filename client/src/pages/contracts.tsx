@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Search, Download, Plus, Eye, Edit, FileText, RefreshCw, Settings, MoreHorizontal, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 import ContractViewModal from "@/components/contract-view-modal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -142,6 +143,11 @@ export default function Contracts() {
 
   return (
     <div className="flex flex-col h-full">
+      <Breadcrumb 
+        items={[
+          { label: "Contracts", icon: FileText }
+        ]}
+      />
       {/* Header */}
       <PageHeader 
         title="Contract Management"
