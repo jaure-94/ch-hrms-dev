@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { User, Eye, Edit, Download, MoreHorizontal, FileText } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { User, Eye, Edit, Download, MoreHorizontal, FileText, Trash2 } from "lucide-react";
 import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import EmployeeDetailsModal from "./employee-details-modal";
 
 interface Employee {
@@ -63,6 +67,32 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
   const [isModalOpen, setIsModalOpen] = useState(false);
   const itemsPerPage = 10;
   const totalPages = Math.ceil(employees.length / itemsPerPage);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // For demo purposes, using a hardcoded company ID
+  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+
+  // Delete employee mutation
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      await apiRequest('DELETE', `/api/employees/${employeeId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Employee deleted successfully",
+        description: "The employee has been removed from the system.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'employees'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete employee",
+        description: error.message || "There was an error deleting the employee. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
   
   const paginatedEmployees = employees.slice(
     (currentPage - 1) * itemsPerPage,
@@ -77,6 +107,10 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedEmployee(null);
+  };
+
+  const handleDeleteEmployee = (employeeId: string) => {
+    deleteEmployeeMutation.mutate(employeeId);
   };
 
   const getStatusColor = (status: string) => {
@@ -190,6 +224,41 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
                         <FileText className="mr-2 h-4 w-4" />
                         Generate Contract
                       </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <DropdownMenuItem 
+                            className="text-red-600 focus:text-red-600"
+                            onSelect={(e) => e.preventDefault()}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Employee
+                          </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Employee</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {employee.firstName} {employee.lastName}? 
+                              This action cannot be undone and will remove all employee data, employment records, 
+                              and associated contracts from the system.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteEmployee(employee.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                              disabled={deleteEmployeeMutation.isPending}
+                            >
+                              {deleteEmployeeMutation.isPending ? (
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                              ) : null}
+                              Delete Employee
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
