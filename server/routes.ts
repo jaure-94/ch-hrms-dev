@@ -230,6 +230,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update employee employment status
+  app.put("/api/employees/:id/status", async (req, res) => {
+    try {
+      const { status, statusDate, statusManager, statusReason, statusNotes } = req.body;
+      
+      const employment = await storage.getEmploymentByEmployee(req.params.id);
+      if (!employment) {
+        return res.status(404).json({ message: "Employee employment record not found" });
+      }
+
+      const updatedEmployment = await storage.updateEmployment(employment.id, {
+        status,
+        // Store status change details in a JSON field or separate table
+        // For now, we'll add these fields to the employment record
+        statusChangeDate: statusDate ? new Date(statusDate) : new Date(),
+        statusChangeManager: statusManager,
+        statusChangeReason: statusReason,
+        statusChangeNotes: statusNotes,
+      });
+
+      res.json(updatedEmployment);
+    } catch (error) {
+      console.error('Update employment status error:', error);
+      res.status(500).json({ message: "Failed to update employment status" });
+    }
+  });
+
   // Contract generation route with template support
   app.post("/api/employees/:id/contract", async (req, res) => {
     try {

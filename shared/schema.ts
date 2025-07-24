@@ -59,6 +59,10 @@ export const employments = pgTable("employments", {
   taxCode: text("tax_code"),
   benefits: jsonb("benefits"),
   status: text("status").default("active"),
+  statusChangeDate: timestamp("status_change_date"),
+  statusChangeManager: text("status_change_manager"),
+  statusChangeReason: text("status_change_reason"),
+  statusChangeNotes: text("status_change_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

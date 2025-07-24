@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { User, Eye, Edit, Download } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { User, Eye, Edit, Download, MoreHorizontal, FileText } from "lucide-react";
+import { Link } from "wouter";
 import EmployeeDetailsModal from "./employee-details-modal";
 
 interface Employee {
@@ -166,27 +168,30 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex items-center justify-end space-x-2">
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => handleViewEmployee(employee)}
-                      title="View Employee Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" title="Edit Employee">
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDownloadContract(employee.id)}
-                      title="Download Contract"
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewEmployee(employee)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href={`/employees/edit/${employee.id}`}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Employee
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDownloadContract(employee.id)}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Generate Contract
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             ))}

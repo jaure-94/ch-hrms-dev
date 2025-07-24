@@ -13,6 +13,7 @@ import ContractTemplate from "@/pages/contract-template";
 import ContractGenerate from "@/pages/contract-generate";
 import Users from "@/pages/users";
 import Analytics from "@/pages/analytics";
+import EditEmployee from "@/pages/edit-employee";
 import Sidebar from "@/components/sidebar";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/employees" component={Employees} />
+      <Route path="/employees/edit/:id" component={EditEmployee} />
       <Route path="/contracts" component={Contracts} />
       <Route path="/contracts/template" component={ContractTemplate} />
       <Route path="/contracts/generate" component={ContractGenerate} />
