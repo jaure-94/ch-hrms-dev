@@ -1,11 +1,49 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCompanySchema, insertEmployeeSchema, insertEmploymentSchema, contractTemplates } from "@shared/schema";
+import { 
+  insertCompanySchema, 
+  insertEmployeeSchema, 
+  insertEmploymentSchema, 
+  contractTemplates,
+  loginSchema,
+  signupSchema,
+  users,
+  roles,
+  companies,
+  companySettings,
+  departments,
+  refreshTokens,
+  type User,
+  type Role,
+  type Company
+} from "@shared/schema";
 import { z } from "zod";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { 
+  authenticateUser, 
+  hashPassword, 
+  generateAccessToken, 
+  generateRefreshToken, 
+  storeRefreshToken, 
+  removeRefreshToken, 
+  validateRefreshToken,
+  verifyRefreshToken,
+  getUserWithPermissions,
+  authenticateToken,
+  type AuthenticatedRequest,
+  type JWTPayload
+} from "./auth";
+import { 
+  requireSuperuser, 
+  requireAdmin, 
+  requireManager, 
+  requireEmployee,
+  ROLE_PERMISSIONS,
+  ROLE_LEVELS
+} from "./rbac";
 
 const employeeFormSchema = z.object({
   // Personal Information
@@ -49,8 +87,549 @@ const employeeFormSchema = z.object({
   companyId: z.string().uuid("Invalid company ID"),
 });
 
+// Helper function to seed initial roles
+async function seedRoles(): Promise<void> {
+  const existingRoles = await db.select().from(roles).limit(1);
+  if (existingRoles.length > 0) return; // Roles already seeded
+
+  const rolesToSeed = [
+    {
+      name: 'superuser',
+      description: 'Full system access and company management',
+      level: ROLE_LEVELS.SUPERUSER,
+      permissions: ROLE_PERMISSIONS.superuser,
+    },
+    {
+      name: 'admin',
+      description: 'Administrative access within company',
+      level: ROLE_LEVELS.ADMIN,
+      permissions: ROLE_PERMISSIONS.admin,
+    },
+    {
+      name: 'manager',
+      description: 'Team management and employee oversight',
+      level: ROLE_LEVELS.MANAGER,
+      permissions: ROLE_PERMISSIONS.manager,
+    },
+    {
+      name: 'employee',
+      description: 'Basic employee access',
+      level: ROLE_LEVELS.EMPLOYEE,
+      permissions: ROLE_PERMISSIONS.employee,
+    },
+  ];
+
+  await db.insert(roles).values(rolesToSeed);
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Company routes
+  // Ensure roles are seeded
+  await seedRoles();
+
+  // Authentication routes
+  app.post("/auth/signup", async (req, res) => {
+    try {
+      const validatedData = signupSchema.parse(req.body);
+      
+      // Check if this is the first company (superuser signup)
+      const existingCompanies = await db.select().from(companies).limit(1);
+      if (existingCompanies.length > 0) {
+        return res.status(400).json({ error: "Company signup is only allowed for the first company" });
+      }
+
+      // Check if email already exists
+      const existingUser = await db.select().from(users).where(eq(users.email, validatedData.email.toLowerCase())).limit(1);
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      // Get superuser role
+      const superuserRole = await db.select().from(roles).where(eq(roles.name, 'superuser')).limit(1);
+      if (!superuserRole[0]) {
+        return res.status(500).json({ error: "Superuser role not found" });
+      }
+
+      // Create company
+      const newCompany = await db.insert(companies).values({
+        ...validatedData.company,
+        setupCompleted: false,
+      }).returning();
+
+      // Hash password
+      const passwordHash = await hashPassword(validatedData.password);
+
+      // Create superuser
+      const newUser = await db.insert(users).values({
+        email: validatedData.email.toLowerCase(),
+        passwordHash,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        companyId: newCompany[0].id,
+        roleId: superuserRole[0].id,
+        isActive: true,
+        emailVerified: true, // Auto-verify for superuser
+      }).returning();
+
+      // Generate tokens
+      const payload: JWTPayload = {
+        userId: newUser[0].id,
+        companyId: newCompany[0].id,
+        roleId: superuserRole[0].id,
+        roleName: 'superuser',
+        roleLevel: ROLE_LEVELS.SUPERUSER,
+        email: newUser[0].email,
+      };
+
+      const accessToken = generateAccessToken(payload);
+      const refreshToken = generateRefreshToken(newUser[0].id);
+      
+      // Store refresh token
+      await storeRefreshToken(newUser[0].id, refreshToken);
+
+      // Set refresh token as HTTP-only cookie
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.status(201).json({
+        user: {
+          id: newUser[0].id,
+          email: newUser[0].email,
+          firstName: newUser[0].firstName,
+          lastName: newUser[0].lastName,
+          role: 'superuser',
+          companyId: newCompany[0].id,
+        },
+        company: newCompany[0],
+        accessToken,
+      });
+    } catch (error) {
+      console.error('Signup error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create account" });
+    }
+  });
+
+  app.post("/auth/login", async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+      
+      // Authenticate user
+      const userPayload = await authenticateUser(email, password);
+      if (!userPayload) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      // Generate tokens
+      const accessToken = generateAccessToken(userPayload);
+      const refreshToken = generateRefreshToken(userPayload.userId);
+      
+      // Store refresh token
+      await storeRefreshToken(userPayload.userId, refreshToken);
+
+      // Set refresh token as HTTP-only cookie
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      // Get user details
+      const userDetails = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        })
+        .from(users)
+        .where(eq(users.id, userPayload.userId))
+        .limit(1);
+
+      res.json({
+        user: {
+          ...userDetails[0],
+          role: userPayload.roleName,
+          companyId: userPayload.companyId,
+        },
+        accessToken,
+      });
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid login data" });
+      }
+      res.status(500).json({ error: "Failed to login" });
+    }
+  });
+
+  app.post("/auth/refresh", async (req, res) => {
+    try {
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) {
+        return res.status(401).json({ error: "Refresh token required" });
+      }
+
+      // Verify refresh token
+      const decoded = verifyRefreshToken(refreshToken);
+      const userId = await validateRefreshToken(refreshToken);
+      
+      if (!userId || userId !== decoded.userId) {
+        return res.status(401).json({ error: "Invalid refresh token" });
+      }
+
+      // Get updated user information
+      const userPayload = await getUserWithPermissions(userId);
+      if (!userPayload) {
+        return res.status(401).json({ error: "User not found" });
+      }
+
+      // Generate new access token
+      const accessToken = generateAccessToken(userPayload);
+
+      res.json({ accessToken });
+    } catch (error) {
+      console.error('Refresh error:', error);
+      res.status(401).json({ error: "Invalid or expired refresh token" });
+    }
+  });
+
+  app.post("/auth/logout", async (req, res) => {
+    try {
+      const refreshToken = req.cookies.refreshToken;
+      if (refreshToken) {
+        await removeRefreshToken(refreshToken);
+      }
+
+      // Clear refresh token cookie
+      res.clearCookie('refreshToken');
+      res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error('Logout error:', error);
+      res.status(500).json({ error: "Failed to logout" });
+    }
+  });
+
+  // User management routes
+  app.get("/me", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      // Get full user details with company and role information
+      const userDetails = await db
+        .select({
+          user: users,
+          role: roles,
+          company: companies,
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .innerJoin(companies, eq(users.companyId, companies.id))
+        .where(eq(users.id, req.user.userId))
+        .limit(1);
+
+      if (!userDetails[0]) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { user, role, company } = userDetails[0];
+
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        lastLoginAt: user.lastLoginAt,
+        role: {
+          id: role.id,
+          name: role.name,
+          description: role.description,
+          level: role.level,
+          permissions: role.permissions,
+        },
+        company: {
+          id: company.id,
+          name: company.name,
+          setupCompleted: company.setupCompleted,
+        },
+      });
+    } catch (error) {
+      console.error('Get user error:', error);
+      res.status(500).json({ error: "Failed to get user details" });
+    }
+  });
+
+  app.get("/users", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+
+      const usersList = await db
+        .select({
+          user: users,
+          role: roles,
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .where(eq(users.companyId, companyId))
+        .orderBy(users.createdAt);
+
+      const formattedUsers = usersList.map(({ user, role }) => ({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        isActive: user.isActive,
+        emailVerified: user.emailVerified,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        role: {
+          id: role.id,
+          name: role.name,
+          description: role.description,
+          level: role.level,
+        },
+      }));
+
+      res.json(formattedUsers);
+    } catch (error) {
+      console.error('Get users error:', error);
+      res.status(500).json({ error: "Failed to get users" });
+    }
+  });
+
+  app.post("/users", authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+      
+      const createUserSchema = z.object({
+        email: z.string().email("Invalid email format"),
+        password: z.string().min(8, "Password must be at least 8 characters"),
+        firstName: z.string().min(1, "First name is required"),
+        lastName: z.string().min(1, "Last name is required"),
+        roleName: z.enum(['admin', 'manager', 'employee'], {
+          required_error: "Role is required"
+        }),
+        employeeId: z.string().uuid().optional(),
+      });
+
+      const validatedData = createUserSchema.parse(req.body);
+
+      // Check if email already exists
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, validatedData.email.toLowerCase()))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+
+      // Get role
+      const role = await db
+        .select()
+        .from(roles)
+        .where(eq(roles.name, validatedData.roleName))
+        .limit(1);
+
+      if (!role[0]) {
+        return res.status(400).json({ error: "Invalid role specified" });
+      }
+
+      // Hash password
+      const passwordHash = await hashPassword(validatedData.password);
+
+      // Create user
+      const newUser = await db.insert(users).values({
+        email: validatedData.email.toLowerCase(),
+        passwordHash,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        companyId,
+        roleId: role[0].id,
+        employeeId: validatedData.employeeId || null,
+        isActive: true,
+        emailVerified: false,
+      }).returning();
+
+      res.status(201).json({
+        id: newUser[0].id,
+        email: newUser[0].email,
+        firstName: newUser[0].firstName,
+        lastName: newUser[0].lastName,
+        isActive: newUser[0].isActive,
+        role: {
+          name: role[0].name,
+          description: role[0].description,
+          level: role[0].level,
+        },
+      });
+    } catch (error) {
+      console.error('Create user error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  app.post("/companies/setup", authenticateToken, requireSuperuser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.user!.companyId;
+
+      const setupSchema = z.object({
+        // Company details
+        companyNumber: z.string().optional(),
+        
+        // HR Settings
+        defaultNoticePeriodWeeks: z.number().int().min(1).max(52).default(4),
+        workingHoursPerWeek: z.number().min(1).max(80).default(37.5),
+        workingDaysPerWeek: z.number().int().min(1).max(7).default(5),
+        leaveEntitlementDays: z.number().int().min(0).max(365).default(25),
+        probationPeriodMonths: z.number().int().min(0).max(24).default(6),
+        currency: z.string().default("GBP"),
+        timezone: z.string().default("Europe/London"),
+        publicHolidays: z.array(z.string()).default([]),
+        
+        // Initial departments
+        departments: z.array(z.object({
+          name: z.string().min(1, "Department name is required"),
+          description: z.string().optional(),
+        })).default([]),
+      });
+
+      const validatedData = setupSchema.parse(req.body);
+
+      // Update company setup status and details
+      await db
+        .update(companies)
+        .set({
+          companyNumber: validatedData.companyNumber,
+          setupCompleted: true,
+          updatedAt: new Date(),
+        })
+        .where(eq(companies.id, companyId));
+
+      // Create company settings
+      await db.insert(companySettings).values({
+        companyId,
+        defaultNoticePeriodWeeks: validatedData.defaultNoticePeriodWeeks,
+        workingHoursPerWeek: validatedData.workingHoursPerWeek.toString(),
+        workingDaysPerWeek: validatedData.workingDaysPerWeek,
+        leaveEntitlementDays: validatedData.leaveEntitlementDays,
+        probationPeriodMonths: validatedData.probationPeriodMonths,
+        currency: validatedData.currency,
+        timezone: validatedData.timezone,
+        publicHolidays: validatedData.publicHolidays,
+      });
+
+      // Create initial departments
+      if (validatedData.departments.length > 0) {
+        await db.insert(departments).values(
+          validatedData.departments.map(dept => ({
+            companyId,
+            name: dept.name,
+            description: dept.description || null,
+            managerId: null,
+            isActive: true,
+          }))
+        );
+      }
+
+      res.json({ message: "Company setup completed successfully" });
+    } catch (error) {
+      console.error('Company setup error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid setup data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to complete company setup" });
+    }
+  });
+
+  app.get("/companies/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.params.id;
+      
+      // Ensure user can access this company
+      if (req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Get company with settings and departments
+      const companyResult = await db
+        .select({
+          company: companies,
+          settings: companySettings,
+        })
+        .from(companies)
+        .leftJoin(companySettings, eq(companies.id, companySettings.companyId))
+        .where(eq(companies.id, companyId))
+        .limit(1);
+
+      if (!companyResult[0]) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      const departmentsList = await db
+        .select()
+        .from(departments)
+        .where(eq(departments.companyId, companyId))
+        .orderBy(departments.name);
+
+      res.json({
+        ...companyResult[0].company,
+        settings: companyResult[0].settings,
+        departments: departmentsList,
+      });
+    } catch (error) {
+      console.error('Get company error:', error);
+      res.status(500).json({ error: "Failed to get company details" });
+    }
+  });
+
+  app.patch("/companies/:id", authenticateToken, requireSuperuser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const companyId = req.params.id;
+      
+      // Ensure user can access this company
+      if (req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      const updateCompanySchema = insertCompanySchema.partial();
+      const validatedData = updateCompanySchema.parse(req.body);
+
+      const updatedCompany = await db
+        .update(companies)
+        .set({ ...validatedData, updatedAt: new Date() })
+        .where(eq(companies.id, companyId))
+        .returning();
+
+      if (!updatedCompany[0]) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      res.json(updatedCompany[0]);
+    } catch (error) {
+      console.error('Update company error:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid company data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update company" });
+    }
+  });
+
+  // Company routes (legacy - will be protected in next iteration)
   app.get("/api/companies", async (req, res) => {
     try {
       const companies = await storage.getCompanies();
