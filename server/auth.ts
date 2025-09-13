@@ -97,6 +97,10 @@ export const validateRefreshToken = async (token: string): Promise<string | null
 
 // User authentication helpers
 export const authenticateUser = async (email: string, password: string): Promise<JWTPayload | null> => {
+  console.log('=== AUTHENTICATE USER DEBUG ===');
+  console.log('Email:', email);
+  console.log('Password provided:', password ? 'YES' : 'NO');
+  
   const result = await db
     .select({
       user: users,
@@ -114,15 +118,23 @@ export const authenticateUser = async (email: string, password: string): Promise
     )
     .limit(1);
 
+  console.log('Database query result:', result.length > 0 ? 'USER FOUND' : 'NO USER FOUND');
+  
   if (!result[0]) {
+    console.log('No user found for email:', email);
     return null;
   }
 
   const { user, role, company } = result[0];
+  console.log('Found user:', user.email, 'with hash:', user.passwordHash.substring(0, 20) + '...');
 
   // Verify password
+  console.log('Verifying password...');
   const isValidPassword = await verifyPassword(password, user.passwordHash);
+  console.log('Password valid:', isValidPassword);
+  
   if (!isValidPassword) {
+    console.log('Password verification failed!');
     return null;
   }
 
