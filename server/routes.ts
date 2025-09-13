@@ -548,6 +548,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/companies/setup", authenticateToken, requireSuperuser, async (req: AuthenticatedRequest, res) => {
     try {
+      console.log('=== COMPANY SETUP API DEBUG ===');
+      console.log('Company ID:', req.user!.companyId);
+      console.log('Request body:', req.body);
+      
       const companyId = req.user!.companyId;
 
       const setupSchema = z.object({
@@ -572,8 +576,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = setupSchema.parse(req.body);
+      console.log('Validated data:', validatedData);
+
+      // Check if setup is already completed
+      const existingCompany = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
+      console.log('Existing company:', existingCompany[0]);
+      
+      if (existingCompany[0]?.setupCompleted) {
+        console.log('Setup already completed, returning success');
+        return res.json({ message: "Company setup already completed" });
+      }
 
       // Update company setup status and details
+      console.log('Updating company...');
       await db
         .update(companies)
         .set({
@@ -583,21 +598,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
         .where(eq(companies.id, companyId));
 
-      // Create company settings
-      await db.insert(companySettings).values({
-        companyId,
-        defaultNoticePeriodWeeks: validatedData.defaultNoticePeriodWeeks,
-        workingHoursPerWeek: validatedData.workingHoursPerWeek.toString(),
-        workingDaysPerWeek: validatedData.workingDaysPerWeek,
-        leaveEntitlementDays: validatedData.leaveEntitlementDays,
-        probationPeriodMonths: validatedData.probationPeriodMonths,
-        currency: validatedData.currency,
-        timezone: validatedData.timezone,
-        publicHolidays: validatedData.publicHolidays,
-      });
+      // Check if company settings already exist
+      const existingSettings = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).limit(1);
+      console.log('Existing settings:', existingSettings.length > 0 ? 'FOUND' : 'NOT FOUND');
+
+      if (existingSettings.length === 0) {
+        console.log('Creating company settings...');
+        await db.insert(companySettings).values({
+          companyId,
+          defaultNoticePeriodWeeks: validatedData.defaultNoticePeriodWeeks,
+          workingHoursPerWeek: validatedData.workingHoursPerWeek.toString(),
+          workingDaysPerWeek: validatedData.workingDaysPerWeek,
+          leaveEntitlementDays: validatedData.leaveEntitlementDays,
+          probationPeriodMonths: validatedData.probationPeriodMonths,
+          currency: validatedData.currency,
+          timezone: validatedData.timezone,
+          publicHolidays: validatedData.publicHolidays,
+        });
+      } else {
+        console.log('Updating existing company settings...');
+        await db
+          .update(companySettings)
+          .set({
+            defaultNoticePeriodWeeks: validatedData.defaultNoticePeriodWeeks,
+            workingHoursPerWeek: validatedData.workingHoursPerWeek.toString(),
+            workingDaysPerWeek: validatedData.workingDaysPerWeek,
+            leaveEntitlementDays: validatedData.leaveEntitlementDays,
+            probationPeriodMonths: validatedData.probationPeriodMonths,
+            currency: validatedData.currency,
+            timezone: validatedData.timezone,
+            publicHolidays: validatedData.publicHolidays,
+            updatedAt: new Date(),
+          })
+          .where(eq(companySettings.companyId, companyId));
+      }
 
       // Create initial departments
       if (validatedData.departments.length > 0) {
+        console.log('Creating departments:', validatedData.departments.length);
         await db.insert(departments).values(
           validatedData.departments.map(dept => ({
             companyId,
@@ -609,9 +647,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
 
+      console.log('Setup completed successfully!');
       res.json({ message: "Company setup completed successfully" });
     } catch (error) {
-      console.error('Company setup error:', error);
+      console.error('=== COMPANY SETUP ERROR ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
+      
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid setup data", details: error.errors });
       }

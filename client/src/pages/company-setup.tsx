@@ -81,14 +81,23 @@ export default function CompanySetup() {
   });
 
   const onSubmit = async (data: SetupFormData) => {
+    console.log('=== COMPANY SETUP SUBMISSION DEBUG ===');
+    console.log('Setup data:', data);
+    
     setError('');
     setIsLoading(true);
 
     try {
-      await authenticatedApiRequest('POST', '/companies/setup', data);
+      console.log('Making POST request to /companies/setup...');
+      const response = await authenticatedApiRequest('POST', '/companies/setup', data);
+      console.log('Setup API response:', response);
+      console.log('Setup completed successfully, redirecting to dashboard...');
       setLocation('/dashboard');
     } catch (err) {
-      setError('Failed to complete setup. Please try again.');
+      console.error('=== COMPANY SETUP ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      setError(`Failed to complete setup: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -145,7 +154,7 @@ export default function CompanySetup() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-3xl space-y-6">
         {/* Header */}
         <div className="text-center">
