@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar, Settings } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import { authenticatedApiRequest } from "@/lib/auth";
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,6 +22,11 @@ export default function UsersPage() {
   
   const { data: users, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'users', searchQuery],
+    queryFn: async () => {
+      const searchParam = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/users${searchParam}`);
+      return response.json();
+    },
     enabled: !!companyId,
   });
 
