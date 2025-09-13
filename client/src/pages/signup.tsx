@@ -298,6 +298,7 @@ export default function Signup() {
                               placeholder="123 Business Street, City, Country"
                               className="min-h-[80px]"
                               {...field}
+                              value={field.value || ''}
                             />
                           </FormControl>
                           <FormMessage />
@@ -313,7 +314,7 @@ export default function Signup() {
                           <FormItem>
                             <FormLabel>Phone (Optional)</FormLabel>
                             <FormControl>
-                              <Input placeholder="+44 20 1234 5678" {...field} />
+                              <Input placeholder="+44 20 1234 5678" {...field} value={field.value || ''} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -331,6 +332,7 @@ export default function Signup() {
                                 type="email"
                                 placeholder="info@company.com"
                                 {...field}
+                                value={field.value || ''}
                               />
                             </FormControl>
                             <FormMessage />
@@ -346,7 +348,7 @@ export default function Signup() {
                         <FormItem>
                           <FormLabel>Website (Optional)</FormLabel>
                           <FormControl>
-                            <Input placeholder="https://www.company.com" {...field} />
+                            <Input placeholder="https://www.company.com" {...field} value={field.value || ''} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -360,7 +362,7 @@ export default function Signup() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Industry (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select industry" />
@@ -385,7 +387,7 @@ export default function Signup() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Company Size (Optional)</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} defaultValue={field.value || ''}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select size" />

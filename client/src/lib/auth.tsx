@@ -43,15 +43,15 @@ export interface SignupData {
   lastName: string;
   company: {
     name: string;
-    address?: string;
-    phone?: string;
-    email?: string;
-    website?: string;
-    industry?: string;
-    size?: string;
+    address?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    website?: string | null;
+    industry?: string | null;
+    size?: string | null;
     departments?: Array<{
       name: string;
-      description?: string;
+      description?: string | null;
     }>;
   };
 }

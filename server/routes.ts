@@ -207,16 +207,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
+      // Get full user details with role and company information for response
+      const userDetails = await db
+        .select({
+          user: users,
+          role: roles,
+          company: companies,
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .innerJoin(companies, eq(users.companyId, companies.id))
+        .where(eq(users.id, newUser[0].id))
+        .limit(1);
+
+      const { user, role, company } = userDetails[0];
+
       res.status(201).json({
         user: {
-          id: newUser[0].id,
-          email: newUser[0].email,
-          firstName: newUser[0].firstName,
-          lastName: newUser[0].lastName,
-          role: 'superuser',
-          companyId: newCompany[0].id,
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          lastLoginAt: user.lastLoginAt,
+          role: {
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            level: role.level,
+            permissions: role.permissions,
+          },
+          company: {
+            id: company.id,
+            name: company.name,
+            setupCompleted: company.setupCompleted,
+          },
         },
-        company: newCompany[0],
         accessToken,
       });
     } catch (error) {
@@ -253,23 +280,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
-      // Get user details
+      // Get full user details with role and company information
       const userDetails = await db
         .select({
-          id: users.id,
-          email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
+          user: users,
+          role: roles,
+          company: companies,
         })
         .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .innerJoin(companies, eq(users.companyId, companies.id))
         .where(eq(users.id, userPayload.userId))
         .limit(1);
 
+      if (!userDetails[0]) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { user, role, company } = userDetails[0];
+
       res.json({
         user: {
-          ...userDetails[0],
-          role: userPayload.roleName,
-          companyId: userPayload.companyId,
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          lastLoginAt: user.lastLoginAt,
+          role: {
+            id: role.id,
+            name: role.name,
+            description: role.description,
+            level: role.level,
+            permissions: role.permissions,
+          },
+          company: {
+            id: company.id,
+            name: company.name,
+            setupCompleted: company.setupCompleted,
+          },
         },
         accessToken,
       });
