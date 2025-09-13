@@ -108,8 +108,8 @@ export const authenticatedApiRequest = async (
   // Try with current token
   let res = await makeRequest(accessToken || undefined);
 
-  // If unauthorized and we have a token, try to refresh
-  if (res.status === 401 && accessToken) {
+  // If unauthorized, try to refresh (even if no current token)
+  if (res.status === 401) {
     // Use existing refresh promise or create new one
     if (!tokenRefreshPromise) {
       tokenRefreshPromise = refreshAccessToken();
