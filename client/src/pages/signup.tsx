@@ -72,16 +72,25 @@ export default function Signup() {
   });
 
   const onSubmit = async (data: SignupFormData) => {
+    console.log('=== SIGNUP FORM SUBMISSION DEBUG ===');
+    console.log('Form data:', data);
+    
     setError('');
     setIsLoading(true);
 
     try {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...signupData } = data;
+      console.log('Sending signup data:', signupData);
+      
       await signup(signupData);
+      console.log('Signup successful, redirecting...');
       setLocation('/company-setup');
     } catch (err) {
-      setError('Failed to create account. Please try again.');
+      console.error('=== SIGNUP ERROR ===');
+      console.error('Error object:', err);
+      console.error('Error message:', err instanceof Error ? err.message : String(err));
+      setError(`Failed to create account: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
     }

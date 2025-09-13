@@ -210,9 +210,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signup = async (signupData: SignupData) => {
+    console.log('=== AUTH CONTEXT SIGNUP DEBUG ===');
+    console.log('Signup data received:', signupData);
+    
     try {
+      console.log('Making POST request to /auth/signup...');
       const res = await apiRequest('POST', '/auth/signup', signupData);
+      console.log('Response status:', res.status);
+      
       const data = await res.json();
+      console.log('Response data:', data);
       
       setAccessToken(data.accessToken);
       
@@ -222,8 +229,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading: false,
         isAuthenticated: true,
       });
+      
+      console.log('Signup successful, auth state updated');
     } catch (error) {
-      throw new Error('Signup failed');
+      console.error('=== AUTH CONTEXT SIGNUP ERROR ===');
+      console.error('Error in signup:', error);
+      throw error; // Re-throw the original error instead of masking it
     }
   };
 
