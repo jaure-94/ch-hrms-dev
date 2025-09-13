@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Building, Home, Users, UserPlus, FileText, BarChart, User, Settings, ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { Building, Home, Users, UserPlus, FileText, BarChart, User, Settings, ChevronLeft, ChevronRight, Menu, LogOut, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import chLogoMid from "@assets/ch-logo-mid_1751733209224.png";
 import chLogoPlain from "@assets/ch-logo-plain_1751733209226.png";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/lib/auth";
 
 interface SidebarProps {
   selectedCompanyId: string;
@@ -17,6 +19,7 @@ interface SidebarProps {
 
 export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapsed, onToggleCollapse }: SidebarProps) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
   
   const { data: companies } = useQuery({
     queryKey: ['/api/companies'],
@@ -45,6 +48,31 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
   const isActive = (path: string) => {
     if (path === "/dashboard" && location === "/") return true;
     return location === path;
+  };
+
+  const formatUserRole = (role: { name: string; level: number }) => {
+    // Convert role level to user-friendly names
+    switch (role.level) {
+      case 1:
+        return "Superuser";
+      case 2:
+        return "Admin";
+      case 3:
+        return "Manager";
+      case 4:
+        return "Employee";
+      default:
+        return role.name;
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      // The auth context will handle redirecting to login
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
@@ -137,24 +165,80 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
       {/* User Profile */}
       <div className={`${isCollapsed ? 'p-2' : 'p-4'} border-t border-gray-200`}>
         {!isCollapsed ? (
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-gray-600" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-gray-900">Leo Kaluza</p>
-              <p className="text-xs text-gray-500">Admin</p>
-            </div>
-            <Button variant="ghost" size="sm">
-              <Settings className="w-4 h-4 text-gray-400" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="w-full h-auto p-0 hover:bg-gray-50">
+                <div className="flex items-center space-x-3 w-full p-2 rounded">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-medium text-gray-900" data-testid="text-username">
+                      {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                    </p>
+                    <p className="text-xs text-gray-500" data-testid="text-userrole">
+                      {user ? formatUserRole(user.role) : 'Loading...'}
+                    </p>
+                  </div>
+                  <Settings className="w-4 h-4 text-gray-400" />
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {user?.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem data-testid="button-account-details">
+                <UserCog className="mr-2 h-4 w-4" />
+                <span>Account Details</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
-          <div className="flex justify-center">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-              <User className="w-4 h-4 text-gray-600" />
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full h-auto p-2 hover:bg-gray-50">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-blue-600" />
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {user ? `${user.firstName} ${user.lastName}` : 'Loading...'}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {user?.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem data-testid="button-account-details">
+                <UserCog className="mr-2 h-4 w-4" />
+                <span>Account Details</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} data-testid="button-logout">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </div>
