@@ -13,6 +13,8 @@ import {
   companies,
   companySettings,
   departments,
+  employees,
+  employments,
   refreshTokens,
   type User,
   type Role,
@@ -21,7 +23,7 @@ import {
 import { z } from "zod";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, ilike } from "drizzle-orm";
 import { 
   authenticateUser, 
   hashPassword, 
@@ -767,6 +769,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid company data", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create company" });
+    }
+  });
+
+  // Users routes
+  app.get("/api/companies/:companyId/users", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const { search } = req.query;
+      
+      // Ensure user can access this company (superuser can access any company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Build the query to get users with their roles and optional employee data
+      let query = db
+        .select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          isActive: users.isActive,
+          emailVerified: users.emailVerified,
+          lastLoginAt: users.lastLoginAt,
+          createdAt: users.createdAt,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            level: roles.level,
+          },
+          employee: {
+            id: employees.id,
+            phone: employees.phone,
+          },
+          employment: {
+            department: employments.department,
+            jobTitle: employments.jobTitle,
+            status: employments.employmentStatus,
+            startDate: employments.startDate,
+          },
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .leftJoin(employees, eq(users.employeeId, employees.id))
+        .leftJoin(employments, eq(employees.id, employments.employeeId))
+        .where(eq(users.companyId, companyId));
+
+      // Add search filter if provided
+      if (search && typeof search === 'string') {
+        const searchTerm = `%${search.toLowerCase()}%`;
+        query = query.where(
+          or(
+            ilike(users.firstName, searchTerm),
+            ilike(users.lastName, searchTerm),
+            ilike(users.email, searchTerm),
+          )
+        );
+      }
+
+      const usersData = await query.orderBy(users.firstName, users.lastName);
+
+      res.json(usersData);
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
     }
   });
 

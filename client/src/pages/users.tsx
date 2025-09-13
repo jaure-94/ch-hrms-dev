@@ -19,64 +19,73 @@ export default function UsersPage() {
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
-  const { data: employees, isLoading } = useQuery({
-    queryKey: ['/api/companies', companyId, 'employees', searchQuery],
+  const { data: users, isLoading } = useQuery({
+    queryKey: ['/api/companies', companyId, 'users', searchQuery],
     enabled: !!companyId,
   });
 
-  // Transform employees data to users with role information
-  const users = employees?.map((employee: any) => ({
-    ...employee,
-    role: getUserRole(employee.employment?.department, employee.employment?.jobTitle),
-    accessLevel: getAccessLevel(employee.employment?.department, employee.employment?.jobTitle),
-    lastLogin: generateLastLogin(),
-    accountStatus: employee.employment?.status === 'active' ? 'active' : 'inactive'
-  })).filter((user: any) => {
-    const matchesRole = !roleFilter || roleFilter === 'all' || user.role === roleFilter;
-    const matchesStatus = !statusFilter || statusFilter === 'all' || user.accountStatus === statusFilter;
+  // Filter users based on search and filters
+  const filteredUsers = users?.filter((user: any) => {
+    const matchesRole = !roleFilter || roleFilter === 'all' || user.role.name === roleFilter;
+    const matchesStatus = !statusFilter || statusFilter === 'all' || 
+      (statusFilter === 'active' && user.isActive) || 
+      (statusFilter === 'inactive' && !user.isActive);
     const matchesSearch = !searchQuery || 
       user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.toLowerCase().includes(searchQuery.toLowerCase());
+      user.role.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesRole && matchesStatus && matchesSearch;
   }) || [];
 
-  function getUserRole(department: string, jobTitle: string) {
-    if (!department || !jobTitle) return 'User';
-    
-    if (department === 'Human Resources') return 'HR Admin';
-    if (jobTitle.toLowerCase().includes('manager') || jobTitle.toLowerCase().includes('director')) return 'Manager';
-    if (jobTitle.toLowerCase().includes('senior')) return 'Senior User';
-    return 'User';
+  // Helper function to format role names for display
+  function formatRoleName(role: { name: string; level: number }) {
+    switch (role.level) {
+      case 1:
+        return "Superuser";
+      case 2:
+        return "Admin";
+      case 3:
+        return "Manager";
+      case 4:
+        return "Employee";
+      default:
+        return role.name;
+    }
   }
 
-  function getAccessLevel(department: string, jobTitle: string) {
-    if (!department || !jobTitle) return 'Read';
-    
-    if (department === 'Human Resources') return 'Full Access';
-    if (jobTitle.toLowerCase().includes('manager') || jobTitle.toLowerCase().includes('director')) return 'Manager Access';
-    return 'Standard Access';
+  // Helper function to get access level based on role
+  function getAccessLevel(role: { name: string; level: number }) {
+    switch (role.level) {
+      case 1:
+        return "Full Access";
+      case 2:
+        return "Full Access";
+      case 3:
+        return "Manager Access";
+      case 4:
+        return "Standard Access";
+      default:
+        return "Standard Access";
+    }
   }
 
-  function generateLastLogin() {
-    // Generate random last login within past 30 days
-    const now = new Date();
-    const randomDays = Math.floor(Math.random() * 30);
-    const lastLogin = new Date(now.getTime() - (randomDays * 24 * 60 * 60 * 1000));
-    return lastLogin.toLocaleDateString();
+  // Helper function to format last login
+  function formatLastLogin(lastLoginAt: string | null) {
+    if (!lastLoginAt) return 'Never';
+    return new Date(lastLoginAt).toLocaleDateString();
   }
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'HR Admin':
+      case 'Superuser':
+        return 'bg-red-100 text-red-800';
+      case 'Admin':
         return 'bg-purple-100 text-purple-800';
       case 'Manager':
         return 'bg-blue-100 text-blue-800';
-      case 'Senior User':
+      case 'Employee':
         return 'bg-green-100 text-green-800';
-      case 'User':
-        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -154,10 +163,10 @@ export default function UsersPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="HR Admin">HR Admin</SelectItem>
-                  <SelectItem value="Manager">Manager</SelectItem>
-                  <SelectItem value="Senior User">Senior User</SelectItem>
-                  <SelectItem value="User">User</SelectItem>
+                  <SelectItem value="superuser">Superuser</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="manager">Manager</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -188,7 +197,7 @@ export default function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user: any) => (
+                  {filteredUsers.map((user: any) => (
                     <TableRow key={user.id} className="hover:bg-gray-50">
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -203,34 +212,34 @@ export default function UsersPage() {
                               <Mail className="w-3 h-3 mr-1" />
                               {user.email}
                             </div>
-                            {user.phone && (
+                            {user.employee?.phone && (
                               <div className="text-sm text-gray-500 flex items-center">
                                 <Phone className="w-3 h-3 mr-1" />
-                                {user.phone}
+                                {user.employee.phone}
                               </div>
                             )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getRoleColor(user.role)}>
+                        <Badge className={getRoleColor(formatRoleName(user.role))}>
                           <Shield className="w-3 h-3 mr-1" />
-                          {user.role}
+                          {formatRoleName(user.role)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {user.accessLevel}
+                        {getAccessLevel(user.role)}
                       </TableCell>
                       <TableCell className="text-gray-900">
                         {user.employment?.department || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900 flex items-center">
                         <Calendar className="w-3 h-3 mr-1 text-gray-400" />
-                        {user.lastLogin}
+                        {formatLastLogin(user.lastLoginAt)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getStatusColor(user.accountStatus)}>
-                          {user.accountStatus}
+                        <Badge className={getStatusColor(user.isActive ? 'active' : 'inactive')}>
+                          {user.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -251,7 +260,7 @@ export default function UsersPage() {
                 </TableBody>
               </Table>
               
-              {!users.length && (
+              {!filteredUsers.length && (
                 <div className="text-center py-8">
                   <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
@@ -269,7 +278,7 @@ export default function UsersPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Users</p>
-                  <p className="text-2xl font-semibold text-gray-900">{users.length}</p>
+                  <p className="text-2xl font-semibold text-gray-900">{users?.length || 0}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <Users className="w-6 h-6 text-blue-600" />
@@ -284,7 +293,7 @@ export default function UsersPage() {
                 <div>
                   <p className="text-sm text-gray-600">Active Users</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {users.filter((u: any) => u.accountStatus === 'active').length}
+                    {users?.filter((u: any) => u.isActive).length || 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -300,7 +309,7 @@ export default function UsersPage() {
                 <div>
                   <p className="text-sm text-gray-600">Admins</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {users.filter((u: any) => u.role === 'HR Admin').length}
+                    {users?.filter((u: any) => u.role.level <= 2).length || 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -316,7 +325,7 @@ export default function UsersPage() {
                 <div>
                   <p className="text-sm text-gray-600">Managers</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {users.filter((u: any) => u.role === 'Manager').length}
+                    {users?.filter((u: any) => u.role.level === 3).length || 0}
                   </p>
                 </div>
                 <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
