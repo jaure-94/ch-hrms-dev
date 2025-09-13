@@ -9,7 +9,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Building2, CheckCircle, ArrowRight, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Loader2, Building2, CheckCircle, ArrowRight, ArrowLeft, Plus, Trash2, Sparkles } from 'lucide-react';
 import { useAuth, type SignupData } from '@/lib/auth';
 import { Link, useLocation } from 'wouter';
 import { signupSchema } from '@shared/schema';
@@ -40,6 +41,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(formSchema),
@@ -72,24 +74,16 @@ export default function Signup() {
   });
 
   const onSubmit = async (data: SignupFormData) => {
-    console.log('=== SIGNUP FORM SUBMISSION DEBUG ===');
-    console.log('Form data:', data);
-    
     setError('');
     setIsLoading(true);
 
     try {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...signupData } = data;
-      console.log('Sending signup data:', signupData);
       
       await signup(signupData);
-      console.log('Signup successful, redirecting...');
-      setLocation('/company-setup');
+      setShowSuccessModal(true);
     } catch (err) {
-      console.error('=== SIGNUP ERROR ===');
-      console.error('Error object:', err);
-      console.error('Error message:', err instanceof Error ? err.message : String(err));
       setError(`Failed to create account: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsLoading(false);
@@ -518,10 +512,17 @@ export default function Signup() {
                       </Button>
                     </Link>
                   ) : (
-                    <Button type="button" variant="outline" onClick={prevStep}>
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Previous
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" onClick={prevStep}>
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Previous
+                      </Button>
+                      <Link href="/login">
+                        <Button variant="ghost" className="text-gray-600 hover:text-gray-800" data-testid="button-sign-in-instead">
+                          Sign In Instead
+                        </Button>
+                      </Link>
+                    </div>
                   )}
 
                   {currentStep === 1 ? (
@@ -546,6 +547,44 @@ export default function Signup() {
             </Form>
           </CardContent>
         </Card>
+
+        {/* Success Modal */}
+        <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
+          <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
+            <DialogHeader className="text-center">
+              <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <div className="relative">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                  <Sparkles className="w-4 h-4 text-green-400 absolute -top-1 -right-1 animate-pulse" />
+                </div>
+              </div>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                Account Created Successfully!
+              </DialogTitle>
+              <DialogDescription className="text-gray-600 mt-2">
+                Welcome to our HR management platform! Your company account has been set up and you're ready to start managing your team.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-col gap-3 mt-6">
+              <Button 
+                onClick={() => setLocation('/company-setup')}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                data-testid="button-continue-setup"
+              >
+                <Building2 className="w-4 h-4 mr-2" />
+                Continue to Company Setup
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setLocation('/login')}
+                className="w-full"
+                data-testid="button-sign-in-later"
+              >
+                Sign In Later
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">
