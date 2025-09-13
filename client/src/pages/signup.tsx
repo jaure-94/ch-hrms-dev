@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -9,34 +9,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Building2, CheckCircle, ArrowRight, ArrowLeft } from 'lucide-react';
-import { useAuth } from '@/lib/auth';
+import { Loader2, Building2, CheckCircle, ArrowRight, ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { useAuth, type SignupData } from '@/lib/auth';
 import { Link, useLocation } from 'wouter';
+import { signupSchema } from '@shared/schema';
 
-const signupSchema = z.object({
-  // Personal Information
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+// Extend the schema to include confirmPassword for form validation
+const formSchema = signupSchema.extend({
   confirmPassword: z.string(),
-  
-  // Company Information
-  company: z.object({
-    name: z.string().min(1, 'Company name is required'),
-    address: z.string().optional(),
-    phone: z.string().optional(),
-    email: z.string().email('Please enter a valid company email').optional().or(z.literal('')),
-    website: z.string().url('Please enter a valid website URL').optional().or(z.literal('')),
-    industry: z.string().optional(),
-    size: z.string().optional(),
-  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
 });
 
-type SignupFormData = z.infer<typeof signupSchema>;
+type SignupFormData = z.infer<typeof formSchema>;
 
 const industryOptions = [
   'Technology', 'Healthcare', 'Finance', 'Education', 'Manufacturing',
@@ -56,7 +42,7 @@ export default function Signup() {
   const [currentStep, setCurrentStep] = useState(1);
 
   const form = useForm<SignupFormData>({
-    resolver: zodResolver(signupSchema),
+    resolver: zodResolver(formSchema),
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -71,8 +57,18 @@ export default function Signup() {
         website: '',
         industry: '',
         size: '',
+        departments: [
+          { name: 'Human Resources', description: 'People and culture management' },
+          { name: 'Finance', description: 'Financial management and accounting' },
+          { name: 'Operations', description: 'Day-to-day business operations' },
+        ],
       },
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "company.departments"
   });
 
   const onSubmit = async (data: SignupFormData) => {
@@ -102,6 +98,10 @@ export default function Signup() {
 
   const prevStep = () => {
     setCurrentStep(1);
+  };
+
+  const addDepartment = () => {
+    append({ name: '', description: '' });
   };
 
   const steps = [
@@ -403,6 +403,69 @@ export default function Signup() {
                           </FormItem>
                         )}
                       />
+                    </div>
+
+                    {/* Departments Section */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-medium">Initial Departments</h3>
+                          <p className="text-sm text-gray-600">
+                            Set up your organizational structure. You can add more departments later.
+                          </p>
+                        </div>
+                        <Button type="button" variant="outline" size="sm" onClick={addDepartment}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add Department
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {fields.map((field, index) => (
+                          <div key={field.id} className="flex items-end gap-3 p-3 border rounded-lg">
+                            <div className="flex-1 grid grid-cols-2 gap-3">
+                              <FormField
+                                control={form.control}
+                                name={`company.departments.${index}.name`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Department Name</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="e.g., Human Resources" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name={`company.departments.${index}.description`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Description (Optional)</FormLabel>
+                                    <FormControl>
+                                      <Input placeholder="Brief description" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+
+                            {fields.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => remove(index)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}

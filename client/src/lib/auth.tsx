@@ -49,6 +49,10 @@ export interface SignupData {
     website?: string;
     industry?: string;
     size?: string;
+    departments?: Array<{
+      name: string;
+      description?: string;
+    }>;
   };
 }
 

@@ -150,10 +150,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create company
+      const { departments: companyDepartments, ...companyData } = validatedData.company;
       const newCompany = await db.insert(companies).values({
-        ...validatedData.company,
+        ...companyData,
         setupCompleted: false,
       }).returning();
+
+      // Create initial departments if provided
+      if (companyDepartments && companyDepartments.length > 0) {
+        await db.insert(departments).values(
+          companyDepartments.map(dept => ({
+            companyId: newCompany[0].id,
+            name: dept.name,
+            description: dept.description || null,
+            managerId: null,
+          }))
+        );
+      }
 
       // Hash password
       const passwordHash = await hashPassword(validatedData.password);
@@ -760,10 +773,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: validatedData.firstName,
         lastName: validatedData.lastName,
         email: validatedData.email,
-        phone: validatedData.phone,
+        phone: validatedData.phoneNumber,
         address: validatedData.address,
         dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : undefined,
-        emergencyContact: validatedData.emergencyContact,
+        emergencyContact: {
+          name: validatedData.emergencyContactName,
+          phone: validatedData.emergencyContactPhone,
+          relationship: validatedData.emergencyContactRelationship,
+        },
       };
 
       const employee = await storage.updateEmployee(req.params.id, employeeData);
@@ -775,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             jobTitle: validatedData.jobTitle,
             department: validatedData.department,
             manager: validatedData.manager,
-            employmentType: validatedData.employmentType,
+            employmentStatus: validatedData.employmentStatus,
             baseSalary: validatedData.baseSalary,
             payFrequency: validatedData.payFrequency,
             startDate: validatedData.startDate ? new Date(validatedData.startDate) : undefined,
@@ -880,9 +897,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         nationalInsuranceNumber: employee.nationalInsuranceNumber || '',
         gender: employee.gender || '',
         maritalStatus: employee.maritalStatus || '',
-        emergencyContactName: employee.emergencyContactName || '',
-        emergencyContactPhone: employee.emergencyContactPhone || '',
-        emergencyContactRelationship: employee.emergencyContactRelationship || '',
+        emergencyContactName: (employee.emergencyContact as any)?.name || '',
+        emergencyContactPhone: (employee.emergencyContact as any)?.phone || '',
+        emergencyContactRelationship: (employee.emergencyContact as any)?.relationship || '',
         passportNumber: employee.passportNumber || '',
         passportIssueDate: employee.passportIssueDate ? new Date(employee.passportIssueDate).toLocaleDateString() : '',
         passportExpiryDate: employee.passportExpiryDate ? new Date(employee.passportExpiryDate).toLocaleDateString() : '',
@@ -904,7 +921,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         weeklyHours: employee.employment?.weeklyHours || '',
         paymentMethod: employee.employment?.paymentMethod || '',
         taxCode: employee.employment?.taxCode || '',
-        benefits: employee.employment?.benefits ? employee.employment.benefits.join(', ') : '',
+        benefits: employee.employment?.benefits ? (Array.isArray(employee.employment.benefits) ? employee.employment.benefits.join(', ') : employee.employment.benefits) : '',
         status: employee.employment?.status || 'active',
         
         // Company variables - Parse address properly for UK format
@@ -980,9 +997,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Company info variations
         company_name: employee.company?.name || '',
         company_address: employee.company?.address || '',
-        company_city: employee.company?.city || 'London',
-        company_postcode: employee.company?.postcode || '',
-        company_country: employee.company?.country || 'United Kingdom',
+        company_city: 'London',
+        company_postcode: 'SW1A 1AA',
+        company_country: 'United Kingdom',
         
         // Additional common template variables
         vacationWeeks: '4', // Standard UK vacation weeks
@@ -1007,7 +1024,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lifeInsurance: 'Included',
         dentalCare: 'Optional',
         gymMembership: 'Optional',
-        companyPhone: 'Optional',
+        companyMobilePhone: 'Optional',
         companyLaptop: 'Provided',
         parkingSpace: 'Available',
         workFromHome: 'Hybrid',
@@ -1077,11 +1094,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
       } catch (error) {
         console.error('Error using docx-templates:', error);
-        console.error('Error details:', error.message);
-        console.error('Error stack:', error.stack);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : 'No stack trace available';
+        console.error('Error details:', errorMessage);
+        console.error('Error stack:', errorStack);
         
         // Return error instead of fallback
-        throw new Error(`Failed to process contract template: ${error.message}`);
+        throw new Error(`Failed to process contract template: ${errorMessage}`);
       }
 
 
@@ -1124,7 +1143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error('Contract generation error:', error);
-      res.status(500).json({ message: "Failed to generate contract", error: error.message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: "Failed to generate contract", error: errorMessage });
     }
   });
 
@@ -1250,7 +1270,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(template);
     } catch (error) {
       console.error("Error creating contract template:", error);
-      res.status(500).json({ message: "Failed to create contract template", error: error.message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ message: "Failed to create contract template", error: errorMessage });
     }
   });
 

@@ -335,8 +335,18 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
-export const signupSchema = insertUserSchema.extend({
-  company: insertCompanySchema,
+// Fix signup schema by omitting fields that are created during signup
+export const signupSchema = insertUserSchema.omit({
+  companyId: true,
+  roleId: true,
+  employeeId: true,
+}).extend({
+  company: insertCompanySchema.extend({
+    departments: z.array(z.object({
+      name: z.string().min(1, "Department name is required"),
+      description: z.string().optional(),
+    })).optional().default([]),
+  }),
 });
 
 export type Company = typeof companies.$inferSelect;
