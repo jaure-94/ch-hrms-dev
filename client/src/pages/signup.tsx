@@ -88,6 +88,9 @@ export default function Signup() {
   };
 
   const nextStep = async () => {
+    // Clear any previous errors when navigating steps
+    setError('');
+    
     const step1Fields = ['firstName', 'lastName', 'email', 'password', 'confirmPassword'] as const;
     const isStep1Valid = await form.trigger(step1Fields);
     
@@ -97,6 +100,8 @@ export default function Signup() {
   };
 
   const prevStep = () => {
+    // Clear any previous errors when navigating steps
+    setError('');
     setCurrentStep(1);
   };
 
@@ -110,7 +115,7 @@ export default function Signup() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-2xl space-y-6">
         {/* Logo/Header */}
         <div className="text-center">
@@ -408,63 +413,86 @@ export default function Signup() {
                     </div>
 
                     {/* Departments Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-lg font-medium">Initial Departments</h3>
-                          <p className="text-sm text-gray-600">
+                    <div className="space-y-6 border-t pt-6 mt-8">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <h3 className="text-xl font-semibold text-gray-900">Initial Departments</h3>
+                          <p className="text-sm text-gray-500 leading-relaxed">
                             Set up your organizational structure. You can add more departments later.
                           </p>
                         </div>
-                        <Button type="button" variant="outline" size="sm" onClick={addDepartment}>
+                        <Button 
+                          type="button" 
+                          variant="default" 
+                          size="sm" 
+                          onClick={addDepartment}
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                        >
                           <Plus className="w-4 h-4 mr-2" />
                           Add Department
                         </Button>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {fields.map((field, index) => (
-                          <div key={field.id} className="flex items-end gap-3 p-3 border rounded-lg">
-                            <div className="flex-1 grid grid-cols-2 gap-3">
-                              <FormField
-                                control={form.control}
-                                name={`company.departments.${index}.name`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Department Name</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="e.g., Human Resources" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                          <div key={field.id} className="relative group">
+                            <div className="flex items-start gap-4 p-6 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
+                              <div className="flex-1 space-y-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <FormField
+                                    control={form.control}
+                                    name={`company.departments.${index}.name`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-gray-700">
+                                          Department Name
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input 
+                                            placeholder="e.g., Human Resources" 
+                                            {...field}
+                                            className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
 
-                              <FormField
-                                control={form.control}
-                                name={`company.departments.${index}.description`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Description (Optional)</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Brief description" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                                  <FormField
+                                    control={form.control}
+                                    name={`company.departments.${index}.description`}
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-sm font-medium text-gray-700">
+                                          Description <span className="text-gray-400">(Optional)</span>
+                                        </FormLabel>
+                                        <FormControl>
+                                          <Input 
+                                            placeholder="Brief description" 
+                                            {...field}
+                                            className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                </div>
+                              </div>
+
+                              {fields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => remove(index)}
+                                  className="text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors duration-200"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
                             </div>
-
-                            {fields.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => remove(index)}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
                           </div>
                         ))}
                       </div>
