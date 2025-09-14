@@ -21,6 +21,7 @@ const createUserSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50, "First name must be less than 50 characters"),
   lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
   email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters").optional(),
   roleId: z.string().uuid("Please select a valid role"),
   isActive: z.boolean(),
 });
@@ -42,6 +43,7 @@ export default function CreateUserPage() {
       firstName: "",
       lastName: "",
       email: "",
+      password: "",
       roleId: "",
       isActive: true,
     },
@@ -208,6 +210,28 @@ export default function CreateUserPage() {
                             />
                           </FormControl>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password"
+                              placeholder="Enter password (optional - will generate random if empty)"
+                              data-testid="input-password"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-gray-500">
+                            Leave empty to auto-generate a secure random password
+                          </div>
                         </FormItem>
                       )}
                     />

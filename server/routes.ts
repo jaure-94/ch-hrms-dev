@@ -917,6 +917,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
         email: z.string().email("Please enter a valid email address"),
         roleId: z.string().uuid("Invalid role ID"),
+        password: z.string().min(8, "Password must be at least 8 characters").optional(),
         isActive: z.boolean(),
         companyId: z.string().uuid("Invalid company ID").optional(), // Optional since it comes from path
       });
@@ -929,7 +930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { firstName, lastName, email, roleId, isActive } = bodyValidation.data;
+      const { firstName, lastName, email, roleId, password, isActive } = bodyValidation.data;
 
       // Check if email already exists within the company
       const existingUser = await db
@@ -963,10 +964,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Cannot assign role higher than your own" });
       }
 
-      // Generate a secure random temporary password 
-      const { randomBytes } = await import('crypto');
-      const defaultPassword = randomBytes(16).toString('hex') + '!A1';
-      const passwordHash = await hashPassword(defaultPassword);
+      // Use provided password or generate a secure random temporary password 
+      let finalPassword = password;
+      if (!finalPassword) {
+        const { randomBytes } = await import('crypto');
+        finalPassword = randomBytes(16).toString('hex') + '!A1';
+      }
+      const passwordHash = await hashPassword(finalPassword);
 
       // Create user
       const newUserData = await db.insert(users).values({
