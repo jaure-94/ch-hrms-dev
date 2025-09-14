@@ -47,7 +47,7 @@ export default function Company() {
 
   if (isLoadingCompany) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 px-6">
         <Breadcrumb items={breadcrumbItems} />
         <PageHeader
           title="Company"
@@ -67,7 +67,7 @@ export default function Company() {
 
   if (!company) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 px-6">
         <Breadcrumb items={breadcrumbItems} />
         <PageHeader
           title="Company"
@@ -86,7 +86,7 @@ export default function Company() {
   }
 
   return (
-    <div className="space-y-6" data-testid="company-page">
+    <div className="space-y-6 px-6" data-testid="company-page">
       <Breadcrumb items={breadcrumbItems} />
       
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -319,7 +319,6 @@ export default function Company() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Departments</h3>
               <p className="text-gray-600 mb-4">Get started by adding departments to organize your company structure.</p>
               <Button 
-                onClick={() => setIsEditingCompany(true)}
                 variant="outline"
                 data-testid="button-add-first-department"
               >
