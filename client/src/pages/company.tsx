@@ -219,6 +219,40 @@ export default function Company() {
                   </div>
                 </div>
               </div>
+
+              <Separator />
+
+              {/* Primary User */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Account Primary User</h4>
+                {company.primaryUser ? (
+                  <div className="flex items-start gap-3">
+                    <Users className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Superuser</p>
+                      <p className="text-lg font-semibold text-gray-900" data-testid="text-primary-user-name">
+                        {company.primaryUser.firstName} {company.primaryUser.lastName}
+                      </p>
+                      <p className="text-gray-600" data-testid="text-primary-user-email">
+                        {company.primaryUser.email}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1" data-testid="text-primary-user-since">
+                        Primary user since {new Date(company.primaryUser.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3">
+                    <Users className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Superuser</p>
+                      <p className="text-gray-900" data-testid="text-primary-user-none">
+                        No primary user found
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

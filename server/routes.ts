@@ -2018,9 +2018,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(eq(companySettings.companyId, companyId))
         .limit(1);
 
+      // Get primary user (first-created superuser for this company)
+      const primaryUser = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+          createdAt: users.createdAt,
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .where(and(
+          eq(users.companyId, companyId),
+          eq(roles.level, ROLE_LEVELS.SUPERUSER),
+          eq(users.isActive, true)
+        ))
+        .orderBy(users.createdAt)
+        .limit(1);
+
       const response = {
         ...company[0],
         settings: settings[0] || null,
+        primaryUser: primaryUser[0] || null,
       };
 
       res.json(response);
