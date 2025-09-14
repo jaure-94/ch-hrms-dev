@@ -1418,6 +1418,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Cleanup on deletion: Revoke all refresh tokens for this user
       await revokeUserRefreshTokens(id);
 
+      // Cleanup department manager references: If this user is a department manager, unset the manager reference
+      await db
+        .update(departments)
+        .set({ managerId: null })
+        .where(eq(departments.managerId, id));
+
       // Delete user (this will cascade to related records)
       await db.delete(users).where(eq(users.id, id));
 
