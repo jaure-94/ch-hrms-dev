@@ -18,7 +18,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapsed, onToggleCollapse }: SidebarProps) {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   
   const { data: companies } = useQuery({
@@ -72,6 +72,12 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
       // The auth context will handle redirecting to login
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleAccountDetails = () => {
+    if (user?.id) {
+      setLocation(`/users/${user.id}/profile`);
     }
   };
 
@@ -196,7 +202,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem data-testid="button-account-details">
+              <DropdownMenuItem onClick={handleAccountDetails} data-testid="button-account-details">
                 <UserCog className="mr-2 h-4 w-4" />
                 <span>Account Details</span>
               </DropdownMenuItem>
@@ -228,7 +234,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem data-testid="button-account-details">
+              <DropdownMenuItem onClick={handleAccountDetails} data-testid="button-account-details">
                 <UserCog className="mr-2 h-4 w-4" />
                 <span>Account Details</span>
               </DropdownMenuItem>
