@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, UserPlus, Save, Building, Eye, EyeOff } from "lucide-react";
 import PageHeader from "@/components/page-header";
@@ -21,29 +22,14 @@ const createUserSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50, "First name must be less than 50 characters"),
   lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
   email: z.string().email("Please enter a valid email address"),
-  password: z.preprocess(
-    (val) => val === "" ? undefined : val,
-    z.string().min(8, "Password must be at least 8 characters").optional()
-  ),
-  confirmPassword: z.preprocess(
-    (val) => val === "" ? undefined : val,
-    z.string().min(8, "Password must be at least 8 characters").optional()
-  ),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
   roleId: z.string().uuid("Please select a valid role"),
   departmentId: z.preprocess(
     (val) => val === "none" ? undefined : val,
     z.string().uuid("Please select a valid department").optional()
   ),
   isActive: z.boolean(),
-}).refine((data) => {
-  // Only validate password match if both passwords are provided
-  if (data.password && data.confirmPassword) {
-    return data.password === data.confirmPassword;
-  }
-  return true;
-}, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;
@@ -52,6 +38,7 @@ export default function CreateUserPage() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -120,7 +107,35 @@ export default function CreateUserPage() {
   });
 
   const onSubmit = (data: CreateUserForm) => {
-    createUserMutation.mutate(data);
+    // Custom validation for manual password entry
+    if (!autoGeneratePassword) {
+      if (!data.password || data.password.length < 8) {
+        form.setError("password", {
+          message: "Password must be at least 8 characters when not auto-generating"
+        });
+        return;
+      }
+      if (!data.confirmPassword) {
+        form.setError("confirmPassword", {
+          message: "Please confirm your password"
+        });
+        return;
+      }
+      if (data.password !== data.confirmPassword) {
+        form.setError("confirmPassword", {
+          message: "Passwords don't match"
+        });
+        return;
+      }
+    }
+
+    // Prepare submission data
+    const submitData = {
+      ...data,
+      autoGeneratePassword, // Include the auto-generate flag for backend processing
+    };
+    
+    createUserMutation.mutate(submitData);
   };
 
   const handleCancel = () => {
@@ -248,6 +263,45 @@ export default function CreateUserPage() {
                       )}
                     />
 
+                    {/* Password Option Selection */}
+                    <div className="space-y-4">
+                      <FormLabel>Password Setup</FormLabel>
+                      <RadioGroup 
+                        value={autoGeneratePassword ? "auto" : "manual"}
+                        onValueChange={(value) => {
+                          setAutoGeneratePassword(value === "auto");
+                          if (value === "auto") {
+                            // Clear password fields and errors when switching to auto-generate
+                            form.setValue("password", "");
+                            form.setValue("confirmPassword", "");
+                            form.clearErrors("password");
+                            form.clearErrors("confirmPassword");
+                          }
+                        }}
+                        className="flex flex-col space-y-2"
+                        data-testid="radio-password-option"
+                      >
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="auto" id="auto" data-testid="radio-auto-generate" />
+                          <label htmlFor="auto" className="text-sm font-medium">
+                            Auto-generate password
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="manual" id="manual" data-testid="radio-manual-password" />
+                          <label htmlFor="manual" className="text-sm font-medium">
+                            Set manual password
+                          </label>
+                        </div>
+                      </RadioGroup>
+                      {autoGeneratePassword && (
+                        <div className="text-xs text-gray-500 pl-6">
+                          A secure random password will be generated automatically
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Password Fields - Always shown, disabled when auto-generate is selected */}
                     <FormField
                       control={form.control}
                       name="password"
@@ -258,7 +312,8 @@ export default function CreateUserPage() {
                             <div className="relative">
                               <Input 
                                 type={showPassword ? "text" : "password"}
-                                placeholder="Enter password (optional - will generate random if empty)"
+                                placeholder={autoGeneratePassword ? "Password will be auto-generated" : "Enter password"}
+                                disabled={autoGeneratePassword}
                                 data-testid="input-password"
                                 {...field}
                               />
@@ -268,6 +323,7 @@ export default function CreateUserPage() {
                                 size="sm"
                                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                                 onClick={() => setShowPassword(!showPassword)}
+                                disabled={autoGeneratePassword}
                                 data-testid="toggle-password-visibility"
                               >
                                 {showPassword ? (
@@ -280,7 +336,7 @@ export default function CreateUserPage() {
                           </FormControl>
                           <FormMessage />
                           <div className="text-xs text-gray-500">
-                            Leave empty to auto-generate a secure random password
+                            {autoGeneratePassword ? "A secure random password will be generated" : "Must be at least 8 characters long"}
                           </div>
                         </FormItem>
                       )}
@@ -296,7 +352,8 @@ export default function CreateUserPage() {
                             <div className="relative">
                               <Input 
                                 type={showConfirmPassword ? "text" : "password"}
-                                placeholder="Confirm password (optional if password is empty)"
+                                placeholder={autoGeneratePassword ? "No confirmation needed" : "Confirm password"}
+                                disabled={autoGeneratePassword}
                                 data-testid="input-confirm-password"
                                 {...field}
                               />
@@ -306,6 +363,7 @@ export default function CreateUserPage() {
                                 size="sm"
                                 className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                disabled={autoGeneratePassword}
                                 data-testid="toggle-confirm-password-visibility"
                               >
                                 {showConfirmPassword ? (
@@ -318,7 +376,7 @@ export default function CreateUserPage() {
                           </FormControl>
                           <FormMessage />
                           <div className="text-xs text-gray-500">
-                            Must match password if provided
+                            {autoGeneratePassword ? "Automatic generation doesn't require confirmation" : "Must match the password above"}
                           </div>
                         </FormItem>
                       )}
@@ -460,12 +518,23 @@ export default function CreateUserPage() {
                     </div>
                   </div>
 
-                  {/* Default Password Notice */}
+                  {/* Conditional Password Notice */}
                   <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                    <h4 className="text-sm font-medium text-blue-900">Default Password</h4>
-                    <p className="text-sm text-blue-800 mt-1">
-                      The user will be created with a temporary password. They will be required to change it upon first login.
-                    </p>
+                    {autoGeneratePassword ? (
+                      <>
+                        <h4 className="text-sm font-medium text-blue-900">Auto-Generated Password</h4>
+                        <p className="text-sm text-blue-800 mt-1">
+                          A secure random password will be generated automatically. The user will be required to change it upon first login.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h4 className="text-sm font-medium text-blue-900">Manual Password</h4>
+                        <p className="text-sm text-blue-800 mt-1">
+                          The user will be created with the password you specify. Ensure it follows your organization's password policy.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {/* Actions */}
