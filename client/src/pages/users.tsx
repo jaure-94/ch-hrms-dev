@@ -1,21 +1,26 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar, Settings } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar, Settings, MoreHorizontal, UserX, UserCheck, Trash2 } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import { authenticatedApiRequest } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // For demo purposes, using a hardcoded company ID
   const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
@@ -28,6 +33,48 @@ export default function UsersPage() {
       return response.json();
     },
     enabled: !!companyId,
+  });
+
+  // Toggle user active status mutation
+  const toggleUserStatusMutation = useMutation({
+    mutationFn: async (data: { userId: string; isActive: boolean }) => {
+      await apiRequest('PATCH', `/api/users/${data.userId}/status`, { isActive: data.isActive });
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: `User ${variables.isActive ? 'activated' : 'deactivated'} successfully`,
+        description: `The user has been ${variables.isActive ? 'activated' : 'deactivated'}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'users'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update user status",
+        description: error.message || "There was an error updating the user status. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      await apiRequest('DELETE', `/api/users/${userId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "User deleted successfully",
+        description: "The user has been removed from the system.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'users'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete user",
+        description: error.message || "There was an error deleting the user. Please try again.",
+        variant: "destructive",
+      });
+    }
   });
 
   // Filter users based on search and filters
@@ -81,6 +128,15 @@ export default function UsersPage() {
     if (!lastLoginAt) return 'Never';
     return new Date(lastLoginAt).toLocaleDateString();
   }
+
+  // Handler functions
+  const handleToggleUserStatus = (userId: string, currentStatus: boolean) => {
+    toggleUserStatusMutation.mutate({ userId, isActive: !currentStatus });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    deleteUserMutation.mutate(userId);
+  };
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -249,17 +305,81 @@ export default function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button variant="ghost" size="sm" title="View Profile">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" title="Edit User">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" title="User Settings">
-                            <Settings className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" data-testid={`button-actions-${user.id}`}>
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem data-testid={`button-view-${user.id}`}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              View Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem data-testid={`button-edit-${user.id}`}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Edit User
+                            </DropdownMenuItem>
+                            <DropdownMenuItem data-testid={`button-settings-${user.id}`}>
+                              <Settings className="mr-2 h-4 w-4" />
+                              User Settings
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleToggleUserStatus(user.id, user.isActive)}
+                              data-testid={`button-${user.isActive ? 'deactivate' : 'activate'}-${user.id}`}
+                            >
+                              {user.isActive ? (
+                                <>
+                                  <UserX className="mr-2 h-4 w-4" />
+                                  Deactivate User
+                                </>
+                              ) : (
+                                <>
+                                  <UserCheck className="mr-2 h-4 w-4" />
+                                  Activate User
+                                </>
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem 
+                                  className="text-red-600 focus:text-red-600"
+                                  onSelect={(e) => e.preventDefault()}
+                                  data-testid={`button-delete-${user.id}`}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete User
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete {user.firstName} {user.lastName}? 
+                                    This action cannot be undone and will remove the user account and all associated data from the system.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                    disabled={deleteUserMutation.isPending}
+                                    data-testid={`button-confirm-delete-${user.id}`}
+                                  >
+                                    {deleteUserMutation.isPending ? (
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                    ) : null}
+                                    Delete User
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}

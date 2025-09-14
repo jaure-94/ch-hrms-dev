@@ -23,7 +23,7 @@ import {
 import { z } from "zod";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { db } from "./db";
-import { eq, and, or, ilike } from "drizzle-orm";
+import { eq, and, or, ilike, count } from "drizzle-orm";
 import { 
   authenticateUser, 
   hashPassword, 
@@ -88,6 +88,40 @@ const employeeFormSchema = z.object({
   // Company
   companyId: z.string().uuid("Invalid company ID"),
 });
+
+// User management validation schemas
+const userStatusUpdateSchema = z.object({
+  isActive: z.boolean({ required_error: "isActive is required" }),
+});
+
+const userIdSchema = z.object({
+  id: z.string().uuid("Invalid user ID format"),
+});
+
+// Helper function to count active admins in a company
+async function countActiveAdmins(companyId: string): Promise<number> {
+  const result = await db
+    .select({ count: count() })
+    .from(users)
+    .innerJoin(roles, eq(users.roleId, roles.id))
+    .where(
+      and(
+        eq(users.companyId, companyId),
+        eq(users.isActive, true),
+        or(
+          eq(roles.level, ROLE_LEVELS.SUPERUSER),
+          eq(roles.level, ROLE_LEVELS.ADMIN)
+        )
+      )
+    );
+  
+  return result[0]?.count || 0;
+}
+
+// Helper function to revoke all refresh tokens for a user
+async function revokeUserRefreshTokens(userId: string): Promise<void> {
+  await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+}
 
 // Helper function to seed initial roles
 async function seedRoles(): Promise<void> {
@@ -839,6 +873,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to fetch users:', error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Update user status (activate/deactivate)
+  app.patch("/api/users/:id/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Input validation: Validate UUID in path parameter
+      const paramValidation = userIdSchema.safeParse({ id: req.params.id });
+      if (!paramValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid user ID format", 
+          details: paramValidation.error.errors 
+        });
+      }
+
+      // Input validation: Validate request body
+      const bodyValidation = userStatusUpdateSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      const { id } = paramValidation.data;
+      const { isActive } = bodyValidation.data;
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > ROLE_LEVELS.ADMIN) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Self-deactivation prevention: Prevent users from deactivating themselves
+      if (req.user!.userId === id && !isActive) {
+        return res.status(400).json({ 
+          error: "Cannot deactivate your own account. Contact another administrator to deactivate your account." 
+        });
+      }
+
+      // Check if user exists and get their details
+      const targetUser = await db
+        .select({ 
+          companyId: users.companyId, 
+          roleId: users.roleId,
+          isActive: users.isActive 
+        })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+
+      if (!targetUser.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Ensure user can modify this user (superuser can modify any, admins can modify within company)
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== targetUser[0].companyId) {
+        return res.status(403).json({ error: "Access denied to this user" });
+      }
+
+      // Get target user's role information
+      const targetUserRole = await db
+        .select({ level: roles.level })
+        .from(roles)
+        .where(eq(roles.id, targetUser[0].roleId))
+        .limit(1);
+
+      if (!targetUserRole.length) {
+        return res.status(500).json({ error: "Target user role not found" });
+      }
+
+      // Prevent non-superusers from deactivating superusers or equal/higher level users
+      if (targetUserRole[0].level <= req.user!.roleLevel && req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER) {
+        return res.status(403).json({ error: "Cannot modify user with equal or higher permissions" });
+      }
+
+      // Last admin protection: Prevent deactivation of last admin (except by superuser)
+      if (!isActive && req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER) {
+        const isTargetAdmin = targetUserRole[0].level <= ROLE_LEVELS.ADMIN;
+        const isCurrentlyActive = targetUser[0].isActive;
+        
+        if (isTargetAdmin && isCurrentlyActive) {
+          const activeAdminCount = await countActiveAdmins(targetUser[0].companyId);
+          
+          if (activeAdminCount <= 1) {
+            return res.status(400).json({ 
+              error: "Cannot deactivate the last active admin in the company. Please ensure at least one admin remains active before deactivating this user." 
+            });
+          }
+        }
+      }
+
+      // Update user status
+      await db
+        .update(users)
+        .set({ 
+          isActive,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, id));
+
+      res.json({ message: `User ${isActive ? 'activated' : 'deactivated'} successfully` });
+    } catch (error) {
+      console.error('Failed to update user status:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update user status" });
+    }
+  });
+
+  // Delete user
+  app.delete("/api/users/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Input validation: Validate UUID in path parameter
+      const paramValidation = userIdSchema.safeParse({ id: req.params.id });
+      if (!paramValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid user ID format", 
+          details: paramValidation.error.errors 
+        });
+      }
+
+      const { id } = paramValidation.data;
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > ROLE_LEVELS.ADMIN) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Prevent users from deleting themselves
+      if (req.user!.userId === id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      // Check if user exists and get their details
+      const targetUser = await db
+        .select({ 
+          companyId: users.companyId, 
+          roleId: users.roleId,
+          employeeId: users.employeeId,
+          isActive: users.isActive
+        })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+
+      if (!targetUser.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Ensure user can modify this user (superuser can modify any, admins can modify within company)
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== targetUser[0].companyId) {
+        return res.status(403).json({ error: "Access denied to this user" });
+      }
+
+      // Get target user's role information
+      const targetUserRole = await db
+        .select({ level: roles.level })
+        .from(roles)
+        .where(eq(roles.id, targetUser[0].roleId))
+        .limit(1);
+
+      if (!targetUserRole.length) {
+        return res.status(500).json({ error: "Target user role not found" });
+      }
+
+      // Prevent non-superusers from deleting superusers or equal/higher level users
+      if (targetUserRole[0].level <= req.user!.roleLevel && req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER) {
+        return res.status(403).json({ error: "Cannot delete user with equal or higher permissions" });
+      }
+
+      // Last admin protection: Prevent deletion of last admin (except by superuser)
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER) {
+        const isTargetAdmin = targetUserRole[0].level <= ROLE_LEVELS.ADMIN;
+        const isCurrentlyActive = targetUser[0].isActive;
+        
+        if (isTargetAdmin && isCurrentlyActive) {
+          const activeAdminCount = await countActiveAdmins(targetUser[0].companyId);
+          
+          if (activeAdminCount <= 1) {
+            return res.status(400).json({ 
+              error: "Cannot delete the last active admin in the company. Please ensure at least one admin remains active before deleting this user." 
+            });
+          }
+        }
+      }
+
+      // Cleanup on deletion: Revoke all refresh tokens for this user
+      await revokeUserRefreshTokens(id);
+
+      // Delete user (this will cascade to related records)
+      await db.delete(users).where(eq(users.id, id));
+
+      // Return 204 No Content status code for successful deletion
+      res.status(204).send();
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to delete user" });
     }
   });
 
