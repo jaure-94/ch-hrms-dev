@@ -18,6 +18,7 @@ import ContractGenerate from "@/pages/contract-generate";
 import Users from "@/pages/users";
 import Analytics from "@/pages/analytics";
 import EditEmployee from "@/pages/edit-employee";
+import EditUser from "@/pages/edit-user";
 import Sidebar from "@/components/sidebar";
 
 // Public routes (no authentication required)
@@ -98,6 +99,11 @@ function ProtectedRouter() {
           <Route path="/users">
             <ProtectedRoute requiredRoleLevel={2}>
               <Users />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/users/edit/:id">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <EditUser />
             </ProtectedRoute>
           </Route>
 

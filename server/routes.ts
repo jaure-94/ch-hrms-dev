@@ -98,6 +98,27 @@ const userIdSchema = z.object({
   id: z.string().uuid("Invalid user ID format"),
 });
 
+const updateUserSchema = z.object({
+  firstName: z.string()
+    .min(1, "First name is required")
+    .max(50, "First name must be less than 50 characters")
+    .trim(),
+  lastName: z.string()
+    .min(1, "Last name is required")
+    .max(50, "Last name must be less than 50 characters")
+    .trim(),
+  email: z.string()
+    .email("Please enter a valid email address")
+    .toLowerCase()
+    .max(255, "Email must be less than 255 characters"),
+  roleId: z.string()
+    .uuid("Role ID must be a valid UUID format"),
+  isActive: z.boolean({ 
+    required_error: "isActive status is required",
+    invalid_type_error: "isActive must be a boolean"
+  }),
+});
+
 // Helper function to count active admins in a company
 async function countActiveAdmins(companyId: string): Promise<number> {
   const result = await db
@@ -772,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company routes (legacy - will be protected in next iteration)
-  app.get("/api/companies", async (req, res) => {
+  app.get("/api/companies", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const companies = await storage.getCompanies();
       res.json(companies);
@@ -781,7 +802,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:id", async (req, res) => {
+  app.get("/api/companies/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const company = await storage.getCompany(req.params.id);
       if (!company) {
@@ -793,7 +814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies", async (req, res) => {
+  app.post("/api/companies", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(validatedData);
@@ -872,6 +893,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to fetch users:', error);
       res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get roles for a company
+  app.get("/api/companies/:companyId/roles", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company (superuser can access any company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Require admin level access or higher for role management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for role management" });
+      }
+
+      // Get all roles (roles are global, not company-specific)
+      const rolesList = await db
+        .select({
+          id: roles.id,
+          name: roles.name,
+          description: roles.description,
+          level: roles.level,
+        })
+        .from(roles)
+        .orderBy(roles.level);
+
+      res.json(rolesList);
+    } catch (error) {
+      console.error('Failed to fetch roles:', error);
+      res.status(500).json({ error: "Failed to fetch roles" });
     }
   });
 
@@ -982,6 +1036,184 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single user for editing
+  app.get("/api/users/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Input validation: Validate UUID in path parameter
+      const paramValidation = userIdSchema.safeParse({ id: req.params.id });
+      if (!paramValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid user ID format", 
+          details: paramValidation.error.errors 
+        });
+      }
+
+      const { id } = req.params;
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Get user with role and company information
+      const userData = await db
+        .select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          isActive: users.isActive,
+          emailVerified: users.emailVerified,
+          lastLoginAt: users.lastLoginAt,
+          createdAt: users.createdAt,
+          role: {
+            id: roles.id,
+            name: roles.name,
+            level: roles.level,
+          },
+          company: {
+            id: companies.id,
+            name: companies.name,
+          },
+        })
+        .from(users)
+        .innerJoin(roles, eq(users.roleId, roles.id))
+        .innerJoin(companies, eq(users.companyId, companies.id))
+        .where(eq(users.id, id))
+        .limit(1);
+
+      if (!userData.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const user = userData[0];
+
+      // Ensure user can access this user (superuser can access any, admins can access within company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== user.company.id) {
+        return res.status(403).json({ error: "Access denied to this user" });
+      }
+
+      res.json(user);
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // Update user
+  app.put("/api/users/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      // Input validation: Validate UUID in path parameter
+      const paramValidation = userIdSchema.safeParse({ id: req.params.id });
+      if (!paramValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid user ID format", 
+          details: paramValidation.error.errors 
+        });
+      }
+
+      // Input validation: Validate request body with comprehensive Zod schema
+      const bodyValidation = updateUserSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      const { id } = paramValidation.data;
+      const { firstName, lastName, email, roleId, isActive } = bodyValidation.data;
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Check if user exists and belongs to the same company (unless superuser)
+      const targetUser = await db
+        .select({ companyId: users.companyId, roleId: users.roleId })
+        .from(users)
+        .where(eq(users.id, id))
+        .limit(1);
+
+      if (!targetUser.length) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Ensure user can modify this user (superuser can modify any, admins can modify within company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== targetUser[0].companyId) {
+        return res.status(403).json({ error: "Access denied to this user" });
+      }
+
+      // Validate the new role exists and get its level
+      const newRole = await db
+        .select({ level: roles.level })
+        .from(roles)
+        .where(eq(roles.id, roleId))
+        .limit(1);
+
+      if (!newRole.length) {
+        return res.status(400).json({ error: "Invalid role selected" });
+      }
+
+      // Prevent non-superusers from assigning roles equal or higher than their own
+      if (req.user!.roleLevel !== 1 && newRole[0].level <= req.user!.roleLevel) {
+        return res.status(403).json({ error: "Cannot assign role with equal or higher permissions" });
+      }
+
+      // Prevent users from deactivating themselves
+      if (req.user!.userId === id && !isActive) {
+        return res.status(400).json({ error: "Cannot deactivate your own account" });
+      }
+
+      // Check if this would leave the company without any active admins
+      if (!isActive) {
+        const currentRole = await db
+          .select({ level: roles.level })
+          .from(roles)
+          .where(eq(roles.id, targetUser[0].roleId))
+          .limit(1);
+
+        if (currentRole.length && currentRole[0].level <= 2) {
+          const activeAdminCount = await countActiveAdmins(targetUser[0].companyId);
+          if (activeAdminCount <= 1 && req.user!.roleLevel !== 1) {
+            return res.status(403).json({ 
+              error: "Cannot deactivate the last active admin in the company" 
+            });
+          }
+        }
+      }
+
+      // Check if the email is already in use by another user
+      const emailConflict = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.email, email), eq(users.companyId, targetUser[0].companyId)))
+        .limit(1);
+
+      if (emailConflict.length && emailConflict[0].id !== id) {
+        return res.status(409).json({ error: "Email address is already in use" });
+      }
+
+      // Update user
+      await db
+        .update(users)
+        .set({
+          firstName,
+          lastName,
+          email,
+          roleId,
+          isActive,
+        })
+        .where(eq(users.id, id));
+
+      res.json({ message: "User updated successfully" });
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
   // Delete user
   app.delete("/api/users/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
@@ -1077,7 +1309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Employee routes
-  app.get("/api/companies/:companyId/employees", async (req, res) => {
+  app.get("/api/companies/:companyId/employees", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
       const { search } = req.query;
@@ -1095,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/employees/:id", async (req, res) => {
+  app.get("/api/employees/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const employee = await storage.getEmployeeWithEmployment(req.params.id);
       if (!employee) {
@@ -1107,7 +1339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/employees", async (req, res) => {
+  app.post("/api/employees", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = employeeFormSchema.parse(req.body);
       
@@ -1164,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/employees/:id", async (req, res) => {
+  app.put("/api/employees/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = employeeFormSchema.partial().parse(req.body);
       
@@ -1212,7 +1444,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/employees/:id", async (req, res) => {
+  app.delete("/api/employees/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const employment = await storage.getEmploymentByEmployee(req.params.id);
       if (employment) {
@@ -1226,7 +1458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update employee employment status
-  app.put("/api/employees/:id/status", async (req, res) => {
+  app.put("/api/employees/:id/status", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const { status, statusDate, statusManager, statusReason, statusNotes } = req.body;
       
@@ -1253,7 +1485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contract generation route with template support
-  app.post("/api/employees/:id/contract", async (req, res) => {
+  app.post("/api/employees/:id/contract", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const employee = await storage.getEmployeeWithEmployment(req.params.id);
       if (!employee) {
@@ -1548,7 +1780,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contract routes
-  app.get("/api/companies/:companyId/contracts", async (req, res) => {
+  app.get("/api/companies/:companyId/contracts", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const contracts = await storage.getContractsByCompany(req.params.companyId);
       res.json(contracts);
@@ -1557,7 +1789,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contracts/:id", async (req, res) => {
+  app.get("/api/contracts/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const contract = await storage.getContract(req.params.id);
       if (!contract) {
@@ -1569,7 +1801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contracts/:id/download", async (req, res) => {
+  app.get("/api/contracts/:id/download", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const contract = await storage.getContract(req.params.id);
       if (!contract) {
@@ -1607,7 +1839,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contracts/:id", async (req, res) => {
+  app.delete("/api/contracts/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const contract = await storage.getContract(req.params.id);
       if (!contract) {
@@ -1623,7 +1855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contract Template routes
-  app.get("/api/companies/:companyId/contract-templates", async (req, res) => {
+  app.get("/api/companies/:companyId/contract-templates", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const templates = await storage.getContractTemplatesByCompany(req.params.companyId);
       res.json(templates);
@@ -1632,7 +1864,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:companyId/contract-templates/active", async (req, res) => {
+  app.get("/api/companies/:companyId/contract-templates/active", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const template = await storage.getActiveContractTemplate(req.params.companyId);
       if (!template) {
@@ -1644,7 +1876,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies/:companyId/contract-templates", async (req, res) => {
+  app.post("/api/companies/:companyId/contract-templates", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const { name, fileName, fileContent, fileSize, description, uploadedBy } = req.body;
       
@@ -1674,7 +1906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/contract-templates/:id/activate", async (req, res) => {
+  app.put("/api/contract-templates/:id/activate", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const template = await storage.getContractTemplate(req.params.id);
       if (!template) {
@@ -1688,7 +1920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contract-templates/:id", async (req, res) => {
+  app.delete("/api/contract-templates/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const template = await storage.getContractTemplate(req.params.id);
       if (!template) {
@@ -1703,7 +1935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard stats route
-  app.get("/api/companies/:companyId/stats", async (req, res) => {
+  app.get("/api/companies/:companyId/stats", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const employees = await storage.getEmployeesByCompany(req.params.companyId);
       const stats = {

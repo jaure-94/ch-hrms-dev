@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar, Settings, MoreHorizontal, UserX, UserCheck, Trash2 } from "lucide-react";
 import PageHeader from "@/components/page-header";
-import { authenticatedApiRequest } from "@/lib/auth";
+import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -21,9 +22,11 @@ export default function UsersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
   
-  // For demo purposes, using a hardcoded company ID
-  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  // Get company ID from authenticated user
+  const companyId = user?.company?.id;
   
   const { data: users, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'users', searchQuery],
@@ -107,21 +110,6 @@ export default function UsersPage() {
     }
   }
 
-  // Helper function to get access level based on role
-  function getAccessLevel(role: { name: string; level: number }) {
-    switch (role.level) {
-      case 1:
-        return "Full Access";
-      case 2:
-        return "Full Access";
-      case 3:
-        return "Manager Access";
-      case 4:
-        return "Standard Access";
-      default:
-        return "Standard Access";
-    }
-  }
 
   // Helper function to format last login
   function formatLastLogin(lastLoginAt: string | null) {
@@ -136,6 +124,10 @@ export default function UsersPage() {
 
   const handleDeleteUser = (userId: string) => {
     deleteUserMutation.mutate(userId);
+  };
+
+  const handleEditUser = (userId: string) => {
+    setLocation(`/users/edit/${userId}`);
   };
 
   const getRoleColor = (role: string) => {
@@ -251,7 +243,6 @@ export default function UsersPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Role</TableHead>
-                    <TableHead>Access Level</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Last Login</TableHead>
                     <TableHead>Status</TableHead>
@@ -290,9 +281,6 @@ export default function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-gray-900">
-                        {getAccessLevel(user.role)}
-                      </TableCell>
-                      <TableCell className="text-gray-900">
                         {user.employment?.department || 'N/A'}
                       </TableCell>
                       <TableCell className="text-gray-900 flex items-center">
@@ -317,7 +305,10 @@ export default function UsersPage() {
                               <Eye className="mr-2 h-4 w-4" />
                               View Profile
                             </DropdownMenuItem>
-                            <DropdownMenuItem data-testid={`button-edit-${user.id}`}>
+                            <DropdownMenuItem 
+                              onClick={() => handleEditUser(user.id)}
+                              data-testid={`button-edit-${user.id}`}
+                            >
                               <Edit className="mr-2 h-4 w-4" />
                               Edit User
                             </DropdownMenuItem>
