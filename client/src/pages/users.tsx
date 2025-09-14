@@ -13,7 +13,6 @@ import { Search, Download, Plus, Eye, Edit, Users, Shield, Mail, Phone, Calendar
 import PageHeader from "@/components/page-header";
 import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -41,7 +40,7 @@ export default function UsersPage() {
   // Toggle user active status mutation
   const toggleUserStatusMutation = useMutation({
     mutationFn: async (data: { userId: string; isActive: boolean }) => {
-      await apiRequest('PATCH', `/api/users/${data.userId}/status`, { isActive: data.isActive });
+      await authenticatedApiRequest('PATCH', `/api/users/${data.userId}/status`, { isActive: data.isActive });
     },
     onSuccess: (_, variables) => {
       toast({
@@ -62,7 +61,7 @@ export default function UsersPage() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      await apiRequest('DELETE', `/api/users/${userId}`);
+      await authenticatedApiRequest('DELETE', `/api/users/${userId}`);
     },
     onSuccess: () => {
       toast({
