@@ -113,6 +113,7 @@ const updateUserSchema = z.object({
     .max(255, "Email must be less than 255 characters"),
   roleId: z.string()
     .uuid("Role ID must be a valid UUID format"),
+  departmentId: z.string().uuid("Invalid department ID").nullable().optional(),
   isActive: z.boolean({ 
     required_error: "isActive status is required",
     invalid_type_error: "isActive must be a boolean"
@@ -917,7 +918,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
         email: z.string().email("Please enter a valid email address"),
         roleId: z.string().uuid("Invalid role ID"),
-        departmentId: z.string().uuid("Invalid department ID").optional(),
+        departmentId: z.string().uuid("Invalid department ID").nullable().optional(),
         password: z.string().min(8, "Password must be at least 8 characters").optional(),
         isActive: z.boolean(),
         companyId: z.string().uuid("Invalid company ID").optional(), // Optional since it comes from path
@@ -1187,6 +1188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: users.email,
           firstName: users.firstName,
           lastName: users.lastName,
+          departmentId: users.departmentId,
           isActive: users.isActive,
           emailVerified: users.emailVerified,
           lastLoginAt: users.lastLoginAt,
@@ -1249,7 +1251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { id } = paramValidation.data;
-      const { firstName, lastName, email, roleId, isActive } = bodyValidation.data;
+      const { firstName, lastName, email, roleId, departmentId, isActive } = bodyValidation.data;
 
       // Require admin level access or higher for user management
       if (req.user!.roleLevel > 2) {
@@ -1330,6 +1332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName,
           email,
           roleId,
+          departmentId,
           isActive,
         })
         .where(eq(users.id, id));

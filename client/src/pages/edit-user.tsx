@@ -21,6 +21,7 @@ const editUserSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
   roleId: z.string().min(1, "Role is required"),
+  departmentId: z.string().optional(),
   isActive: z.boolean(),
 });
 
@@ -43,6 +44,7 @@ export default function EditUserPage() {
       lastName: "",
       email: "",
       roleId: "",
+      departmentId: "none",
       isActive: true,
     },
   });
@@ -62,6 +64,16 @@ export default function EditUserPage() {
     queryKey: ['/api/companies', companyId, 'roles'],
     queryFn: async () => {
       const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/roles`);
+      return response.json();
+    },
+    enabled: !!companyId,
+  });
+
+  // Fetch available departments
+  const { data: departments, isLoading: isLoadingDepartments } = useQuery({
+    queryKey: ['/api/companies', companyId, 'departments'],
+    queryFn: async () => {
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/departments`);
       return response.json();
     },
     enabled: !!companyId,
@@ -97,13 +109,19 @@ export default function EditUserPage() {
         lastName: targetUser.lastName || "",
         email: targetUser.email || "",
         roleId: targetUser.role?.id || "",
+        departmentId: targetUser.departmentId || "none",
         isActive: targetUser.isActive ?? true,
       });
     }
   }, [targetUser, form]);
 
   const onSubmit = (data: EditUserFormData) => {
-    updateUserMutation.mutate(data);
+    // Convert "none" departmentId to null for backend
+    const payload = {
+      ...data,
+      departmentId: data.departmentId === "none" ? null : data.departmentId
+    } as EditUserFormData & { departmentId: string | null | undefined };
+    updateUserMutation.mutate(payload);
   };
 
   const handleCancel = () => {
@@ -298,6 +316,42 @@ export default function EditUserPage() {
                                     <div className="flex items-center space-x-2">
                                       <Shield className="w-4 h-4" />
                                       <span>{formatRoleName(role)}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="departmentId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Department</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-department">
+                                  <SelectValue placeholder="Select a department (optional)" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <div className="flex items-center space-x-2">
+                                    <span className="text-gray-500">No department</span>
+                                  </div>
+                                </SelectItem>
+                                {departments?.filter((dept: any) => dept.isActive).map((department: any) => (
+                                  <SelectItem key={department.id} value={department.id}>
+                                    <div className="flex items-center space-x-2">
+                                      <Building className="w-4 h-4" />
+                                      <span>{department.name}</span>
+                                      {department.description && (
+                                        <span className="text-xs text-gray-500">- {department.description}</span>
+                                      )}
                                     </div>
                                   </SelectItem>
                                 ))}
