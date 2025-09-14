@@ -21,9 +21,15 @@ const createUserSchema = z.object({
   firstName: z.string().min(1, "First name is required").max(50, "First name must be less than 50 characters"),
   lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
   email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters").optional(),
+  password: z.preprocess(
+    (val) => val === "" ? undefined : val,
+    z.string().min(8, "Password must be at least 8 characters").optional()
+  ),
   roleId: z.string().uuid("Please select a valid role"),
-  departmentId: z.string().uuid("Please select a valid department").optional(),
+  departmentId: z.preprocess(
+    (val) => val === "none" ? undefined : val,
+    z.string().uuid("Please select a valid department").optional()
+  ),
   isActive: z.boolean(),
 });
 
@@ -46,7 +52,7 @@ export default function CreateUserPage() {
       email: "",
       password: "",
       roleId: "",
-      departmentId: "",
+      departmentId: "none",
       isActive: true,
     },
   });
@@ -341,7 +347,7 @@ export default function CreateUserPage() {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">
+                              <SelectItem value="none">
                                 <div className="flex items-center space-x-2">
                                   <span className="text-gray-500">No department</span>
                                 </div>

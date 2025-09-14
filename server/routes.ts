@@ -932,6 +932,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { firstName, lastName, email, roleId, departmentId, password, isActive } = bodyValidation.data;
+      
+      // Convert "none" departmentId to null for database storage
+      const finalDepartmentId = departmentId === "none" ? null : departmentId;
 
       // Check if email already exists within the company
       const existingUser = await db
@@ -981,7 +984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastName,
         companyId,
         roleId,
-        departmentId: departmentId || null,
+        departmentId: finalDepartmentId,
         isActive,
         emailVerified: false,
       }).returning();
