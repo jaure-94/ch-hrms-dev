@@ -60,7 +60,7 @@ export default function CreateUserPage() {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (data: CreateUserForm) => {
-      const response = await apiRequest('POST', `/api/companies/${companyId}/users`, {
+      const response = await authenticatedApiRequest('POST', `/api/companies/${companyId}/users`, {
         ...data,
         companyId,
       });
