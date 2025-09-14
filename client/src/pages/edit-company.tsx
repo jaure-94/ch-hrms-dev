@@ -174,6 +174,9 @@ export default function EditCompany() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "details"] });
       queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId] });
+      
+      // Redirect to company page after successful update
+      setLocation("/company");
     },
     onError: (error: any) => {
       toast({
@@ -636,7 +639,7 @@ export default function EditCompany() {
       </div>
 
       {/* Update Company Button - Moved to bottom after departments section */}
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto pb-12">
         <div className="flex justify-center pt-6 border-t border-gray-200">
           <Button 
             onClick={() => companyForm.handleSubmit(handleCompanySubmit)()}
@@ -645,7 +648,7 @@ export default function EditCompany() {
             size="lg"
           >
             <Save className="w-4 h-4 mr-2" />
-            {updateCompanyMutation.isPending ? "Updating..." : "Update Company"}
+            {updateCompanyMutation.isPending ? "Saving..." : "Save Company Details"}
           </Button>
         </div>
       </div>
