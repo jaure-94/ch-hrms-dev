@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ArrowLeft, UserPlus, Save, Building } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 import { useAuth, authenticatedApiRequest } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -115,6 +116,12 @@ export default function CreateUserPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb 
+        items={[
+          { label: "Users", href: "/users" },
+          { label: "Create User", icon: UserPlus }
+        ]}
+      />
       <PageHeader
         title="Create New User"
         description="Add a new user to your organization"

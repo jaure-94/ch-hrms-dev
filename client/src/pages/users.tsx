@@ -294,9 +294,11 @@ export default function UsersPage() {
                       <TableCell className="text-gray-900">
                         {user.employment?.department || 'N/A'}
                       </TableCell>
-                      <TableCell className="text-gray-900 flex items-center">
-                        <Calendar className="w-3 h-3 mr-1 text-gray-400" />
-                        {formatLastLogin(user.lastLoginAt)}
+                      <TableCell className="text-gray-900">
+                        <div className="flex items-center">
+                          <Calendar className="w-3 h-3 mr-1 text-gray-400" />
+                          {formatLastLogin(user.lastLoginAt)}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(user.isActive ? 'active' : 'inactive')}>

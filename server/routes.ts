@@ -896,6 +896,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create new user for a company
+  app.post("/api/companies/:companyId/users", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company (superuser can access any company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Require admin level access or higher for user management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for user management" });
+      }
+
+      // Input validation: Validate request body
+      const createUserSchema = z.object({
+        firstName: z.string().min(1, "First name is required").max(50, "First name must be less than 50 characters"),
+        lastName: z.string().min(1, "Last name is required").max(50, "Last name must be less than 50 characters"),
+        email: z.string().email("Please enter a valid email address"),
+        roleId: z.string().uuid("Invalid role ID"),
+        isActive: z.boolean(),
+        companyId: z.string().uuid("Invalid company ID").optional(), // Optional since it comes from path
+      });
+
+      const bodyValidation = createUserSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      const { firstName, lastName, email, roleId, isActive } = bodyValidation.data;
+
+      // Check if email already exists within the company
+      const existingUser = await db
+        .select()
+        .from(users)
+        .where(and(
+          eq(users.email, email.toLowerCase()),
+          eq(users.companyId, companyId)
+        ))
+        .limit(1);
+
+      if (existingUser.length > 0) {
+        return res.status(400).json({ error: "Email already exists in this company" });
+      }
+
+      // Verify role exists
+      const roleData = await db
+        .select()
+        .from(roles)
+        .where(eq(roles.id, roleId))
+        .limit(1);
+
+      if (!roleData.length) {
+        return res.status(400).json({ error: "Invalid role specified" });
+      }
+
+      const role = roleData[0];
+
+      // Check role hierarchy - users can only assign roles at their level or lower
+      if (req.user!.roleLevel > role.level) {
+        return res.status(403).json({ error: "Cannot assign role higher than your own" });
+      }
+
+      // Generate a secure random temporary password 
+      const crypto = require('crypto');
+      const defaultPassword = crypto.randomBytes(16).toString('hex') + '!A1';
+      const passwordHash = await hashPassword(defaultPassword);
+
+      // Create user
+      const newUserData = await db.insert(users).values({
+        email: email.toLowerCase(),
+        passwordHash,
+        firstName,
+        lastName,
+        companyId,
+        roleId,
+        isActive,
+        emailVerified: false,
+      }).returning();
+
+      const newUser = newUserData[0];
+
+      // Return the created user with role and company info
+      const response = {
+        id: newUser.id,
+        email: newUser.email,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        isActive: newUser.isActive,
+        emailVerified: newUser.emailVerified,
+        lastLoginAt: newUser.lastLoginAt,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt,
+        role: {
+          id: role.id,
+          name: role.name,
+          level: role.level,
+          description: role.description,
+        },
+        company: {
+          id: companyId,
+          name: 'Company', // Will be populated by the frontend from user context
+        },
+      };
+
+      res.status(201).json(response);
+    } catch (error) {
+      console.error('Failed to create user:', error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
   // Get roles for a company
   app.get("/api/companies/:companyId/roles", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {

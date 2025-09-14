@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, User, Mail, Phone, Calendar, Building, Shield, Clock, UserCheck, UserX } from "lucide-react";
 import PageHeader from "@/components/page-header";
+import Breadcrumb from "@/components/breadcrumb";
 import { authenticatedApiRequest } from "@/lib/auth";
 
 export default function UserProfilePage() {
@@ -101,6 +102,12 @@ export default function UserProfilePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb 
+        items={[
+          { label: "Users", href: "/users" },
+          { label: user ? `${user.firstName} ${user.lastName}` : "User Profile", icon: User }
+        ]}
+      />
       <PageHeader
         title="User Profile"
         description="View detailed information about the user account"
