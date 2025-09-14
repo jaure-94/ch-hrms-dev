@@ -10,6 +10,7 @@ import Login from "@/pages/login";
 import Signup from "@/pages/signup";
 import CompanySetup from "@/pages/company-setup";
 import Dashboard from "@/pages/dashboard";
+import Company from "@/pages/company";
 import Onboarding from "@/pages/onboarding";
 import Employees from "@/pages/employees";
 import Contracts from "@/pages/contracts";
@@ -62,6 +63,13 @@ function ProtectedRouter() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
+          
+          {/* Company Management - Admin+ required */}
+          <Route path="/company">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <Company />
+            </ProtectedRoute>
+          </Route>
           
           {/* Employee Management - Manager+ required */}
           <Route path="/onboarding">

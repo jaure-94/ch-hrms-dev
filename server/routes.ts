@@ -1972,6 +1972,300 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company Details and Departments routes
+  app.get("/api/companies/:companyId/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company (superuser can access any company)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Get company basic details
+      const company = await db
+        .select()
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1);
+
+      if (!company.length) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      // Get company settings
+      const settings = await db
+        .select()
+        .from(companySettings)
+        .where(eq(companySettings.companyId, companyId))
+        .limit(1);
+
+      const response = {
+        ...company[0],
+        settings: settings[0] || null,
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Failed to fetch company details:', error);
+      res.status(500).json({ error: "Failed to fetch company details" });
+    }
+  });
+
+  app.put("/api/companies/:companyId/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company (admin+ required)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+      
+      // Require admin level access or higher for company management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for company management" });
+      }
+
+      // Input validation
+      const updateCompanySchema = z.object({
+        name: z.string().min(1, "Company name is required").max(100, "Company name too long"),
+        address: z.string().optional(),
+        phone: z.string().optional(),
+        email: z.string().email("Invalid email").optional(),
+        website: z.string().optional(),
+        industry: z.string().optional(),
+        size: z.string().optional(),
+        companyNumber: z.string().optional(),
+      });
+
+      const bodyValidation = updateCompanySchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      const updateData = {
+        ...bodyValidation.data,
+        updatedAt: new Date(),
+      };
+
+      // Update company
+      const updatedCompany = await db
+        .update(companies)
+        .set(updateData)
+        .where(eq(companies.id, companyId))
+        .returning();
+
+      if (!updatedCompany.length) {
+        return res.status(404).json({ error: "Company not found" });
+      }
+
+      res.json(updatedCompany[0]);
+    } catch (error) {
+      console.error('Failed to update company details:', error);
+      res.status(500).json({ error: "Failed to update company details" });
+    }
+  });
+
+  app.get("/api/companies/:companyId/departments", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      const departmentsList = await db
+        .select()
+        .from(departments)
+        .where(eq(departments.companyId, companyId))
+        .orderBy(departments.name);
+
+      res.json(departmentsList);
+    } catch (error) {
+      console.error('Failed to fetch departments:', error);
+      res.status(500).json({ error: "Failed to fetch departments" });
+    }
+  });
+
+  app.post("/api/companies/:companyId/departments", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      // Ensure user can access this company (admin+ required)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+      
+      // Require admin level access or higher for department management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for department management" });
+      }
+
+      // Input validation
+      const createDepartmentSchema = z.object({
+        name: z.string().min(1, "Department name is required").max(100, "Department name too long"),
+        description: z.string().optional(),
+        managerId: z.string().uuid().optional(),
+        isActive: z.boolean().default(true),
+      });
+
+      const bodyValidation = createDepartmentSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      // Check if department name already exists for this company
+      const existingDepartment = await db
+        .select()
+        .from(departments)
+        .where(and(
+          eq(departments.companyId, companyId),
+          eq(departments.name, bodyValidation.data.name)
+        ))
+        .limit(1);
+
+      if (existingDepartment.length > 0) {
+        return res.status(400).json({ error: "Department name already exists in this company" });
+      }
+
+      // Create department
+      const newDepartment = await db
+        .insert(departments)
+        .values({
+          companyId,
+          ...bodyValidation.data,
+        })
+        .returning();
+
+      res.status(201).json(newDepartment[0]);
+    } catch (error) {
+      console.error('Failed to create department:', error);
+      res.status(500).json({ error: "Failed to create department" });
+    }
+  });
+
+  app.put("/api/departments/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get department to check company access
+      const existingDepartment = await db
+        .select()
+        .from(departments)
+        .where(eq(departments.id, id))
+        .limit(1);
+
+      if (!existingDepartment.length) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      const department = existingDepartment[0];
+
+      // Ensure user can access this company (admin+ required)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== department.companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+      
+      // Require admin level access or higher for department management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for department management" });
+      }
+
+      // Input validation
+      const updateDepartmentSchema = z.object({
+        name: z.string().min(1, "Department name is required").max(100, "Department name too long"),
+        description: z.string().optional(),
+        managerId: z.string().uuid().optional(),
+        isActive: z.boolean(),
+      });
+
+      const bodyValidation = updateDepartmentSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: bodyValidation.error.errors 
+        });
+      }
+
+      // Check if department name already exists for this company (excluding current department)
+      if (bodyValidation.data.name !== department.name) {
+        const duplicateDepartment = await db
+          .select()
+          .from(departments)
+          .where(and(
+            eq(departments.companyId, department.companyId),
+            eq(departments.name, bodyValidation.data.name)
+          ))
+          .limit(1);
+
+        if (duplicateDepartment.length > 0) {
+          return res.status(400).json({ error: "Department name already exists in this company" });
+        }
+      }
+
+      // Update department
+      const updatedDepartment = await db
+        .update(departments)
+        .set({
+          ...bodyValidation.data,
+          updatedAt: new Date(),
+        })
+        .where(eq(departments.id, id))
+        .returning();
+
+      res.json(updatedDepartment[0]);
+    } catch (error) {
+      console.error('Failed to update department:', error);
+      res.status(500).json({ error: "Failed to update department" });
+    }
+  });
+
+  app.delete("/api/departments/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      // Get department to check company access
+      const existingDepartment = await db
+        .select()
+        .from(departments)
+        .where(eq(departments.id, id))
+        .limit(1);
+
+      if (!existingDepartment.length) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      const department = existingDepartment[0];
+
+      // Ensure user can access this company (admin+ required)
+      if (req.user!.roleLevel !== 1 && req.user!.companyId !== department.companyId) {
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+      
+      // Require admin level access or higher for department management
+      if (req.user!.roleLevel > 2) {
+        return res.status(403).json({ error: "Insufficient permissions for department management" });
+      }
+
+      // TODO: Check if department has employees assigned and handle accordingly
+      // For now, we'll allow deletion but could add a soft delete approach
+
+      await db.delete(departments).where(eq(departments.id, id));
+
+      res.json({ message: "Department deleted successfully" });
+    } catch (error) {
+      console.error('Failed to delete department:', error);
+      res.status(500).json({ error: "Failed to delete department" });
+    }
+  });
+
   // Contract Template routes
   app.get("/api/companies/:companyId/contract-templates", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
