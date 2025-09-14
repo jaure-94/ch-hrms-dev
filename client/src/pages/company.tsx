@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { authenticatedApiRequest } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
-import { EditCompanyForm } from "@/components/edit-company-form";
+import { Link } from "wouter";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
 
@@ -96,18 +96,16 @@ export default function Company() {
           showLogo={false}
         />
         
-        <EditCompanyForm 
-          companyId={companyId} 
-          trigger={
-            <Button 
-              className="flex items-center gap-2"
-              data-testid="button-edit-company"
-            >
-              <Edit className="w-4 h-4" />
-              Edit Company
-            </Button>
-          }
-        />
+        <Button 
+          asChild
+          className="flex items-center gap-2"
+          data-testid="button-edit-company"
+        >
+          <Link href="/company/edit">
+            <Edit className="w-4 h-4" />
+            Edit Company
+          </Link>
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

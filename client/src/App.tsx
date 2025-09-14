@@ -22,6 +22,7 @@ import EditEmployee from "@/pages/edit-employee";
 import EditUser from "@/pages/edit-user";
 import UserProfile from "@/pages/user-profile";
 import CreateUser from "@/pages/create-user";
+import EditCompany from "@/pages/edit-company";
 import Sidebar from "@/components/sidebar";
 
 // Public routes (no authentication required)
@@ -68,6 +69,11 @@ function ProtectedRouter() {
           <Route path="/company">
             <ProtectedRoute requiredRoleLevel={2}>
               <Company />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/company/edit">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <EditCompany />
             </ProtectedRoute>
           </Route>
           
