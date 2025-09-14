@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { authenticatedApiRequest } from "@/lib/auth";
 
 export default function UserProfilePage() {
   const [match, params] = useRoute("/users/:id/profile");
+  const [, setLocation] = useLocation();
   const userId = params?.id;
 
   const { data: user, isLoading, error } = useQuery({
@@ -85,7 +86,7 @@ export default function UserProfilePage() {
               <Button 
                 variant="outline" 
                 className="mt-4"
-                onClick={() => window.history.back()}
+                onClick={() => setLocation('/users')}
                 data-testid="button-back"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
@@ -296,7 +297,7 @@ export default function UserProfilePage() {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => window.location.href = `/users/${user.id}/edit`}
+                  onClick={() => setLocation(`/users/edit/${user.id}`)}
                   data-testid="button-edit-user"
                 >
                   <User className="w-4 h-4 mr-2" />
@@ -305,7 +306,7 @@ export default function UserProfilePage() {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
-                  onClick={() => window.location.href = '/users'}
+                  onClick={() => setLocation('/users')}
                   data-testid="button-view-all-users"
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />

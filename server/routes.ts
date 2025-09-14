@@ -1066,10 +1066,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           emailVerified: users.emailVerified,
           lastLoginAt: users.lastLoginAt,
           createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
           role: {
             id: roles.id,
             name: roles.name,
             level: roles.level,
+            description: roles.description,
           },
           company: {
             id: companies.id,
