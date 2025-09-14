@@ -130,6 +130,14 @@ export default function UsersPage() {
     setLocation(`/users/edit/${userId}`);
   };
 
+  const handleViewProfile = (userId: string) => {
+    setLocation(`/users/${userId}/profile`);
+  };
+
+  const handleAddNewUser = () => {
+    setLocation('/users/create');
+  };
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'Superuser':
@@ -184,7 +192,10 @@ export default function UsersPage() {
           <Settings className="w-4 h-4 mr-2" />
           Bulk Actions
         </Button>
-        <Button>
+        <Button 
+          onClick={handleAddNewUser}
+          data-testid="button-add-user"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add New User
         </Button>
@@ -301,7 +312,10 @@ export default function UsersPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem data-testid={`button-view-${user.id}`}>
+                            <DropdownMenuItem 
+                              onClick={() => handleViewProfile(user.id)}
+                              data-testid={`button-view-${user.id}`}
+                            >
                               <Eye className="mr-2 h-4 w-4" />
                               View Profile
                             </DropdownMenuItem>

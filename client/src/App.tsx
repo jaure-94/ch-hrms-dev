@@ -19,6 +19,8 @@ import Users from "@/pages/users";
 import Analytics from "@/pages/analytics";
 import EditEmployee from "@/pages/edit-employee";
 import EditUser from "@/pages/edit-user";
+import UserProfile from "@/pages/user-profile";
+import CreateUser from "@/pages/create-user";
 import Sidebar from "@/components/sidebar";
 
 // Public routes (no authentication required)
@@ -99,6 +101,16 @@ function ProtectedRouter() {
           <Route path="/users">
             <ProtectedRoute requiredRoleLevel={2}>
               <Users />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/users/create">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <CreateUser />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/users/:id/profile">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <UserProfile />
             </ProtectedRoute>
           </Route>
           <Route path="/users/edit/:id">
