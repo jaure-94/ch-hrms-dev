@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { ArrowLeft, UserPlus, Save, Building } from "lucide-react";
+import { ArrowLeft, UserPlus, Save, Building, Eye, EyeOff } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import Breadcrumb from "@/components/breadcrumb";
 import { useAuth, authenticatedApiRequest } from "@/lib/auth";
@@ -25,18 +25,33 @@ const createUserSchema = z.object({
     (val) => val === "" ? undefined : val,
     z.string().min(8, "Password must be at least 8 characters").optional()
   ),
+  confirmPassword: z.preprocess(
+    (val) => val === "" ? undefined : val,
+    z.string().min(8, "Password must be at least 8 characters").optional()
+  ),
   roleId: z.string().uuid("Please select a valid role"),
   departmentId: z.preprocess(
     (val) => val === "none" ? undefined : val,
     z.string().uuid("Please select a valid department").optional()
   ),
   isActive: z.boolean(),
+}).refine((data) => {
+  // Only validate password match if both passwords are provided
+  if (data.password && data.confirmPassword) {
+    return data.password === data.confirmPassword;
+  }
+  return true;
+}, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type CreateUserForm = z.infer<typeof createUserSchema>;
 
 export default function CreateUserPage() {
   const [, setLocation] = useLocation();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -51,6 +66,7 @@ export default function CreateUserPage() {
       lastName: "",
       email: "",
       password: "",
+      confirmPassword: "",
       roleId: "",
       departmentId: "none",
       isActive: true,
@@ -239,16 +255,70 @@ export default function CreateUserPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="password"
-                              placeholder="Enter password (optional - will generate random if empty)"
-                              data-testid="input-password"
-                              {...field}
-                            />
+                            <div className="relative">
+                              <Input 
+                                type={showPassword ? "text" : "password"}
+                                placeholder="Enter password (optional - will generate random if empty)"
+                                data-testid="input-password"
+                                {...field}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowPassword(!showPassword)}
+                                data-testid="toggle-password-visibility"
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-400" />
+                                )}
+                              </Button>
+                            </div>
                           </FormControl>
                           <FormMessage />
                           <div className="text-xs text-gray-500">
                             Leave empty to auto-generate a secure random password
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm Password</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Input 
+                                type={showConfirmPassword ? "text" : "password"}
+                                placeholder="Confirm password (optional if password is empty)"
+                                data-testid="input-confirm-password"
+                                {...field}
+                              />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                data-testid="toggle-confirm-password-visibility"
+                              >
+                                {showConfirmPassword ? (
+                                  <EyeOff className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                  <Eye className="h-4 w-4 text-gray-400" />
+                                )}
+                              </Button>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                          <div className="text-xs text-gray-500">
+                            Must match password if provided
                           </div>
                         </FormItem>
                       )}
