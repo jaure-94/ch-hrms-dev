@@ -13,7 +13,7 @@ interface BreadcrumbProps {
 
 export default function Breadcrumb({ items }: BreadcrumbProps) {
   return (
-    <div className="bg-gray-50 px-6 py-3 border-b border-gray-200">
+    <div className="sticky top-0 z-20 bg-gray-50 px-6 py-3 border-b border-gray-200">
       <nav className="flex items-center space-x-2 text-sm">
         <Link href="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900 transition-colors">
           <Home className="w-4 h-4 mr-1" />
