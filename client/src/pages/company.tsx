@@ -7,11 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { authenticatedApiRequest } from "@/lib/auth";
 import { useAuth } from "@/lib/auth";
+import { EditCompanyForm } from "@/components/edit-company-form";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
 
 export default function Company() {
-  const [isEditingCompany, setIsEditingCompany] = useState(false);
   const { user } = useAuth();
   const companyId = user?.company?.id;
 
@@ -96,14 +96,18 @@ export default function Company() {
           showLogo={false}
         />
         
-        <Button 
-          onClick={() => setIsEditingCompany(true)}
-          className="flex items-center gap-2"
-          data-testid="button-edit-company"
-        >
-          <Edit className="w-4 h-4" />
-          Edit Company
-        </Button>
+        <EditCompanyForm 
+          companyId={companyId} 
+          trigger={
+            <Button 
+              className="flex items-center gap-2"
+              data-testid="button-edit-company"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Company
+            </Button>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -326,22 +330,6 @@ export default function Company() {
         </CardContent>
       </Card>
 
-      {/* Edit Company Modal/Form will be rendered here */}
-      {isEditingCompany && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold mb-4">Edit Company</h2>
-            <p className="text-gray-600 mb-4">Coming soon - Edit Company form will be implemented here.</p>
-            <Button 
-              onClick={() => setIsEditingCompany(false)}
-              variant="outline"
-              data-testid="button-close-edit"
-            >
-              Close
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
