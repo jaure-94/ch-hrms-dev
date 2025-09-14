@@ -518,16 +518,6 @@ export default function EditCompany() {
                     )}
                   />
 
-                  <div className="flex justify-end">
-                    <Button 
-                      type="submit" 
-                      disabled={updateCompanyMutation.isPending}
-                      data-testid="button-update-company"
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      {updateCompanyMutation.isPending ? "Updating..." : "Update Company"}
-                    </Button>
-                  </div>
                 </form>
               </Form>
             )}
@@ -643,6 +633,21 @@ export default function EditCompany() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      {/* Update Company Button - Moved to bottom after departments section */}
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-center pt-6 border-t border-gray-200">
+          <Button 
+            onClick={() => companyForm.handleSubmit(handleCompanySubmit)()}
+            disabled={updateCompanyMutation.isPending}
+            data-testid="button-update-company"
+            size="lg"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            {updateCompanyMutation.isPending ? "Updating..." : "Update Company"}
+          </Button>
+        </div>
       </div>
 
       {/* Department Form Modal */}
