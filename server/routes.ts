@@ -853,19 +853,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(roles, eq(users.roleId, roles.id))
         .leftJoin(employees, eq(users.employeeId, employees.id))
         .leftJoin(employments, eq(employees.id, employments.employeeId))
-        .where(eq(users.companyId, companyId));
-
-      // Add search filter if provided
-      if (search && typeof search === 'string') {
-        const searchTerm = `%${search.toLowerCase()}%`;
-        query = query.where(
-          or(
-            ilike(users.firstName, searchTerm),
-            ilike(users.lastName, searchTerm),
-            ilike(users.email, searchTerm),
-          )
+        .where(
+          search && typeof search === 'string'
+            ? and(
+                eq(users.companyId, companyId),
+                or(
+                  ilike(users.firstName, `%${search.toLowerCase()}%`),
+                  ilike(users.lastName, `%${search.toLowerCase()}%`),
+                  ilike(users.email, `%${search.toLowerCase()}%`),
+                )
+              )
+            : eq(users.companyId, companyId)
         );
-      }
 
       const usersData = await query.orderBy(users.firstName, users.lastName);
 
