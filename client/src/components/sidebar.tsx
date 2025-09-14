@@ -38,6 +38,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
 
   const navigationItems = [
     { path: "/dashboard", icon: Home, label: "Dashboard" },
+    { path: "/company", icon: Building, label: "Company" },
     { path: "/employees", icon: Users, label: "Employees" },
     { path: "/onboarding", icon: UserPlus, label: "Onboarding" },
     { path: "/contracts", icon: FileText, label: "Contracts" },

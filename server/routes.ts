@@ -964,8 +964,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate a secure random temporary password 
-      const crypto = require('crypto');
-      const defaultPassword = crypto.randomBytes(16).toString('hex') + '!A1';
+      const { randomBytes } = await import('crypto');
+      const defaultPassword = randomBytes(16).toString('hex') + '!A1';
       const passwordHash = await hashPassword(defaultPassword);
 
       // Create user
