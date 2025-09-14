@@ -23,6 +23,7 @@ const createUserSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters").optional(),
   roleId: z.string().uuid("Please select a valid role"),
+  departmentId: z.string().uuid("Please select a valid department").optional(),
   isActive: z.boolean(),
 });
 
@@ -45,6 +46,7 @@ export default function CreateUserPage() {
       email: "",
       password: "",
       roleId: "",
+      departmentId: "",
       isActive: true,
     },
   });
@@ -54,6 +56,16 @@ export default function CreateUserPage() {
     queryKey: ['/api/companies', companyId, 'roles'],
     queryFn: async () => {
       const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/roles`);
+      return response.json();
+    },
+    enabled: !!companyId,
+  });
+
+  // Fetch available departments
+  const { data: departments, isLoading: departmentsLoading } = useQuery({
+    queryKey: ['/api/companies', companyId, 'departments'],
+    queryFn: async () => {
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/departments`);
       return response.json();
     },
     enabled: !!companyId,
@@ -306,6 +318,53 @@ export default function CreateUserPage() {
                         )}
                       />
                     </div>
+                  </div>
+
+                  {/* Department Assignment */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-gray-900">Department Assignment</h3>
+                    
+                    <FormField
+                      control={form.control}
+                      name="departmentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            disabled={departmentsLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-department">
+                                <SelectValue placeholder="Select a department (optional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">
+                                <div className="flex items-center space-x-2">
+                                  <span className="text-gray-500">No department</span>
+                                </div>
+                              </SelectItem>
+                              {departments?.filter((dept: any) => dept.isActive).map((department: any) => (
+                                <SelectItem key={department.id} value={department.id}>
+                                  <div className="flex items-center space-x-2">
+                                    <span>{department.name}</span>
+                                    {department.description && (
+                                      <span className="text-xs text-gray-500">- {department.description}</span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          <div className="text-xs text-gray-500">
+                            Department assignment is optional and can be changed later
+                          </div>
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   {/* Company Information (Read-only) */}

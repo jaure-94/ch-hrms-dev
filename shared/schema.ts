@@ -62,6 +62,7 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   companyId: uuid("company_id").references(() => companies.id).notNull(),
   roleId: uuid("role_id").references(() => roles.id).notNull(),
+  departmentId: uuid("department_id").references(() => departments.id), // Optional: department assignment
   employeeId: uuid("employee_id").references(() => employees.id), // Optional: links to employee record
   isActive: boolean("is_active").default(true),
   emailVerified: boolean("email_verified").default(false),
