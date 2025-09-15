@@ -17,7 +17,7 @@ import Contracts from "@/pages/contracts";
 import ContractTemplate from "@/pages/contract-template";
 import ContractGenerate from "@/pages/contract-generate";
 import Users from "@/pages/users";
-import Analytics from "@/pages/analytics";
+import Logs from "@/pages/logs";
 import EditEmployee from "@/pages/edit-employee";
 import EditUser from "@/pages/edit-user";
 import UserProfile from "@/pages/user-profile";
@@ -133,10 +133,10 @@ function ProtectedRouter() {
             </ProtectedRoute>
           </Route>
 
-          {/* Analytics - Manager+ required */}
-          <Route path="/analytics">
+          {/* System Logs - Manager+ required */}
+          <Route path="/logs">
             <ProtectedRoute requiredRoleLevel={3}>
-              <Analytics />
+              <Logs />
             </ProtectedRoute>
           </Route>
 

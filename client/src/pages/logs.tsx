@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Search, Download, BarChart, Activity, User, Clock, Shield, FileText, Filter } from "lucide-react";
+import { Search, Download, Activity, User, Clock, Shield, FileText, Filter, ScrollText } from "lucide-react";
 import PageHeader from "@/components/page-header";
 import Breadcrumb from "@/components/breadcrumb";
 
@@ -24,7 +24,7 @@ interface ActionLog {
   accessLevel: string;
 }
 
-export default function Analytics() {
+export default function Logs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
@@ -45,12 +45,12 @@ export default function Analytics() {
       'GENERATE_CONTRACT', 'DOWNLOAD_CONTRACT', 'UPDATE_CONTRACT',
       'LOGIN', 'LOGOUT', 'CHANGE_PASSWORD', 'UPDATE_PROFILE',
       'CREATE_USER', 'UPDATE_USER_PERMISSIONS', 'DELETE_USER',
-      'EXPORT_DATA', 'IMPORT_DATA', 'VIEW_ANALYTICS',
+      'EXPORT_DATA', 'IMPORT_DATA', 'VIEW_LOGS',
       'SEARCH_EMPLOYEES', 'FILTER_CONTRACTS', 'BULK_UPDATE'
     ];
 
     const resources = [
-      'Employee Database', 'Contract System', 'User Management', 'Analytics Dashboard',
+      'Employee Database', 'Contract System', 'User Management', 'System Logs',
       'Authentication System', 'Export System', 'Search Engine', 'File System'
     ];
 
@@ -59,7 +59,7 @@ export default function Analytics() {
     
     // Generate 50 sample log entries
     for (let i = 0; i < 50; i++) {
-      const randomEmployee = employees?.[Math.floor(Math.random() * (employees?.length || 1))] || {
+      const randomEmployee = (employees as any[])?.[Math.floor(Math.random() * ((employees as any[])?.length || 1))] || {
         id: 'user-1',
         firstName: 'Leo',
         lastName: 'Kaluza',
@@ -201,26 +201,26 @@ export default function Analytics() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" data-testid="logs-page">
       <Breadcrumb 
         items={[
-          { label: "Analytics", icon: BarChart }
+          { label: "System Logs", icon: ScrollText }
         ]}
       />
       <PageHeader 
-        title="Analytics & Audit Logs"
-        description="Monitor system activity and user actions"
+        title="System Activity Logs"
+        description="Monitor system activity, user actions, and security events"
       >
-        <Button variant="outline">
+        <Button variant="outline" data-testid="button-advanced-filters">
           <Filter className="w-4 h-4 mr-2" />
           Advanced Filters
         </Button>
-        <Button variant="outline" onClick={handleExportLogs}>
+        <Button variant="outline" onClick={handleExportLogs} data-testid="button-export-logs">
           <Download className="w-4 h-4 mr-2" />
-          Export Excel File
+          Export CSV File
         </Button>
-        <Button>
-          <BarChart className="w-4 h-4 mr-2" />
+        <Button data-testid="button-generate-report">
+          <ScrollText className="w-4 h-4 mr-2" />
           Generate Report
         </Button>
       </PageHeader>
@@ -234,7 +234,7 @@ export default function Analytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Actions</p>
-                  <p className="text-2xl font-semibold text-gray-900">{actionLogs.length}</p>
+                  <p className="text-2xl font-semibold text-gray-900" data-testid="text-total-actions">{actionLogs.length}</p>
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                   <Activity className="w-6 h-6 text-blue-600" />
@@ -248,7 +248,7 @@ export default function Analytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Today's Actions</p>
-                  <p className="text-2xl font-semibold text-gray-900">
+                  <p className="text-2xl font-semibold text-gray-900" data-testid="text-todays-actions">
                     {actionLogs.filter(log => {
                       const today = new Date();
                       const logDate = new Date(log.timestamp);
@@ -268,7 +268,7 @@ export default function Analytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Active Users</p>
-                  <p className="text-2xl font-semibold text-gray-900">
+                  <p className="text-2xl font-semibold text-gray-900" data-testid="text-active-users">
                     {new Set(actionLogs.map(log => log.userId)).size}
                   </p>
                 </div>
@@ -284,7 +284,7 @@ export default function Analytics() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Security Events</p>
-                  <p className="text-2xl font-semibold text-gray-900">
+                  <p className="text-2xl font-semibold text-gray-900" data-testid="text-security-events">
                     {actionLogs.filter(log => 
                       log.action.includes('LOGIN') || 
                       log.action.includes('LOGOUT') || 
@@ -318,10 +318,11 @@ export default function Analytics() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
+                  data-testid="input-search-logs"
                 />
               </div>
               <Select value={actionFilter} onValueChange={setActionFilter}>
-                <SelectTrigger className="w-full md:w-48">
+                <SelectTrigger className="w-full md:w-48" data-testid="select-action-filter">
                   <SelectValue placeholder="All Actions" />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,7 +336,7 @@ export default function Analytics() {
                 </SelectContent>
               </Select>
               <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-full md:w-48">
+                <SelectTrigger className="w-full md:w-48" data-testid="select-user-filter">
                   <SelectValue placeholder="All Users" />
                 </SelectTrigger>
                 <SelectContent>
@@ -347,7 +348,7 @@ export default function Analytics() {
                 </SelectContent>
               </Select>
               <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="w-full md:w-48">
+                <SelectTrigger className="w-full md:w-48" data-testid="select-date-filter">
                   <SelectValue placeholder="All Time" />
                 </SelectTrigger>
                 <SelectContent>
@@ -375,7 +376,7 @@ export default function Analytics() {
                 </TableHeader>
                 <TableBody>
                   {filteredLogs.slice(0, 20).map((log) => (
-                    <TableRow key={log.id} className="hover:bg-gray-50">
+                    <TableRow key={log.id} className="hover:bg-gray-50" data-testid={`log-row-${log.id}`}>
                       <TableCell className="text-sm text-gray-900">
                         <div className="flex items-center">
                           <Clock className="w-3 h-3 mr-1 text-gray-400" />
@@ -385,27 +386,27 @@ export default function Analytics() {
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <User className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium text-gray-900">{log.userName}</span>
+                          <span className="font-medium text-gray-900" data-testid={`text-user-name-${log.id}`}>{log.userName}</span>
                         </div>
                         <div className="text-xs text-gray-500">{log.ipAddress}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getRoleColor(log.userRole)}>
+                        <Badge className={getRoleColor(log.userRole)} data-testid={`badge-user-role-${log.id}`}>
                           <Shield className="w-3 h-3 mr-1" />
                           {log.userRole}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={getActionColor(log.action)}>
+                        <Badge className={getActionColor(log.action)} data-testid={`badge-action-${log.id}`}>
                           {log.action}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-gray-900">{log.resource}</TableCell>
-                      <TableCell className="text-sm text-gray-600 max-w-xs truncate">
+                      <TableCell className="text-gray-900" data-testid={`text-resource-${log.id}`}>{log.resource}</TableCell>
+                      <TableCell className="text-sm text-gray-600 max-w-xs truncate" data-testid={`text-details-${log.id}`}>
                         {log.details}
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-gray-900">{log.accessLevel}</span>
+                        <span className="text-sm text-gray-900" data-testid={`text-access-level-${log.id}`}>{log.accessLevel}</span>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -434,18 +435,18 @@ export default function Analytics() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <FileText className="w-5 h-5" />
-              <span>Export All Logs</span>
+              <span>Export System Logs</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
                 <h3 className="font-medium text-gray-900">Complete System Log Export</h3>
-                <p className="text-sm text-gray-600">Download a comprehensive Excel file with all system activity logs, user information, and access levels.</p>
+                <p className="text-sm text-gray-600">Download a comprehensive CSV file with all system activity logs, user information, and access levels.</p>
               </div>
-              <Button onClick={handleExportLogs} className="ml-4">
+              <Button onClick={handleExportLogs} className="ml-4" data-testid="button-download-logs">
                 <Download className="w-4 h-4 mr-2" />
-                Download Excel File
+                Download CSV File
               </Button>
             </div>
           </CardContent>

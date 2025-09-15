@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Building, Home, Users, UserPlus, FileText, BarChart, User, Settings, ChevronLeft, ChevronRight, Menu, LogOut, UserCog } from "lucide-react";
+import { Building, Home, Users, UserPlus, FileText, ScrollText, User, Settings, ChevronLeft, ChevronRight, Menu, LogOut, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import chLogoMid from "@assets/ch-logo-mid_1751733209224.png";
 import chLogoPlain from "@assets/ch-logo-plain_1751733209226.png";
@@ -43,7 +43,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
     { path: "/onboarding", icon: UserPlus, label: "Onboarding" },
     { path: "/contracts", icon: FileText, label: "Contracts" },
     { path: "/users", icon: Settings, label: "Users" },
-    { path: "/analytics", icon: BarChart, label: "Analytics" },
+    { path: "/logs", icon: ScrollText, label: "Logs" },
   ];
 
   const isActive = (path: string) => {
@@ -116,7 +116,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
                 Compliance Hub UK
               </h2>
               <p className="text-sm text-gray-500">
-                {stats?.totalEmployees || 0} employees
+                {(stats as any)?.totalEmployees || 0} employees
               </p>
             </div>
           </div>
@@ -126,7 +126,7 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
               <SelectValue placeholder="Switch Company" />
             </SelectTrigger>
             <SelectContent>
-              {companies?.map((company: any) => (
+              {(companies as any[])?.map((company: any) => (
                 <SelectItem key={company.id} value={company.id}>
                   {company.name}
                 </SelectItem>
