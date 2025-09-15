@@ -135,16 +135,22 @@ export const authenticatedApiRequest = async (
 // Token refresh utility
 const refreshAccessToken = async (): Promise<boolean> => {
   try {
+    console.log('Attempting token refresh...');
     const res = await apiRequest('POST', '/auth/refresh');
+    console.log('Refresh response status:', res.status);
     const data = await res.json();
+    console.log('Refresh response data:', data);
     
     if (data.accessToken) {
       setAccessToken(data.accessToken);
+      console.log('Token refresh successful');
       return true;
     }
+    console.log('No access token in response');
     return false;
   } catch (error) {
     console.error('Token refresh failed:', error);
+    console.log('Full error object:', JSON.stringify(error));
     clearAuth();
     return false;
   }

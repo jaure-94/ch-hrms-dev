@@ -392,27 +392,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/auth/refresh", async (req, res) => {
     try {
+      console.log('Refresh token request received');
+      console.log('Cookies received:', Object.keys(req.cookies || {}));
       const refreshToken = req.cookies.refreshToken;
       if (!refreshToken) {
+        console.log('No refresh token found in cookies');
         return res.status(401).json({ error: "Refresh token required" });
       }
 
       // Verify refresh token
+      console.log('Verifying refresh token...');
       const decoded = verifyRefreshToken(refreshToken);
+      console.log('Token decoded:', decoded ? 'success' : 'failed');
+      
       const userId = await validateRefreshToken(refreshToken);
+      console.log('Token validation result:', userId);
       
       if (!userId || userId !== decoded.userId) {
+        console.log('Token validation failed: userId mismatch');
         return res.status(401).json({ error: "Invalid refresh token" });
       }
 
       // Get updated user information
+      console.log('Getting user permissions for userId:', userId);
       const userPayload = await getUserWithPermissions(userId);
       if (!userPayload) {
+        console.log('User not found for userId:', userId);
         return res.status(401).json({ error: "User not found" });
       }
 
       // Generate new access token
+      console.log('Generating new access token...');
       const accessToken = generateAccessToken(userPayload);
+      console.log('Access token generated successfully');
 
       res.json({ accessToken });
     } catch (error) {

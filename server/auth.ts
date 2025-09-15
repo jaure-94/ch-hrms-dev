@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Request, Response, NextFunction } from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, gt } from 'drizzle-orm';
 import { db } from './db';
 import { users, refreshTokens, roles, companies } from '../shared/schema';
 import type { User, Role, Company } from '../shared/schema';
@@ -87,7 +87,7 @@ export const validateRefreshToken = async (token: string): Promise<string | null
     .where(
       and(
         eq(refreshTokens.token, token),
-        eq(refreshTokens.expiresAt, new Date()) // Token not expired
+        gt(refreshTokens.expiresAt, new Date()) // Token not expired
       )
     )
     .limit(1);

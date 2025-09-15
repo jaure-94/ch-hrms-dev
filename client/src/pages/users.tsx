@@ -27,7 +27,7 @@ export default function UsersPage() {
   // Get company ID from authenticated user
   const companyId = user?.company?.id;
   
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ['/api/companies', companyId, 'users', searchQuery],
     queryFn: async () => {
       const searchParam = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
@@ -35,6 +35,7 @@ export default function UsersPage() {
       return response.json();
     },
     enabled: !!companyId,
+    retry: 1,
   });
 
   // Toggle user active status mutation
@@ -79,19 +80,20 @@ export default function UsersPage() {
     }
   });
 
-  // Filter users based on search and filters
-  const filteredUsers = users?.filter((user: any) => {
+  // Filter users based on search and filters - with defensive programming
+  const filteredUsers = (Array.isArray(users) ? users : []).filter((user: any) => {
+    if (!user || !user.role) return false;
     const matchesRole = !roleFilter || roleFilter === 'all' || user.role.name === roleFilter;
     const matchesStatus = !statusFilter || statusFilter === 'all' || 
       (statusFilter === 'active' && user.isActive) || 
       (statusFilter === 'inactive' && !user.isActive);
     const matchesSearch = !searchQuery || 
-      user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.role.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (user.firstName && user.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.lastName && user.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.role?.name && user.role.name.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesRole && matchesStatus && matchesSearch;
-  }) || [];
+  });
 
   // Helper function to format role names for display
   function formatRoleName(role: { name: string; level: number }) {
@@ -173,6 +175,30 @@ export default function UsersPage() {
           <div className="h-4 bg-gray-200 rounded w-96 mb-8"></div>
           <div className="h-96 bg-gray-200 rounded"></div>
         </div>
+      </div>
+    );
+  }
+
+  // Show error state if query failed
+  if (error) {
+    return (
+      <div className="flex-1 p-6">
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Users className="w-12 h-12 text-red-400 mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Users</h3>
+            <p className="text-gray-600 mb-4 text-center">
+              There was an error loading the user data. This might be due to an authentication issue.
+            </p>
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+              data-testid="button-retry-users"
+            >
+              Retry Loading
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
