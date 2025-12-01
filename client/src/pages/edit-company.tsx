@@ -187,27 +187,7 @@ export default function EditCompany() {
     },
   });
 
-  // Create department mutation
-  const createDepartmentMutation = useMutation({
-    mutationFn: (data: DepartmentFormData) =>
-      authenticatedApiRequest("POST", `/api/companies/${companyId}/departments`, data),
-    onSuccess: () => {
-      toast({
-        title: "Department Created",
-        description: "Department has been created successfully.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "departments"] });
-      setShowDepartmentForm(false);
-      departmentForm.reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Creation Failed",
-        description: error.message || "Failed to create department.",
-        variant: "destructive",
-      });
-    },
-  });
+  // Note: Department creation is now handled on the create-department page
 
   // Update department mutation
   const updateDepartmentMutation = useMutation({
@@ -274,8 +254,6 @@ export default function EditCompany() {
     
     if (editingDepartment) {
       updateDepartmentMutation.mutate({ id: editingDepartment.id, data: normalizedData });
-    } else {
-      createDepartmentMutation.mutate(normalizedData);
     }
   };
 
@@ -295,14 +273,8 @@ export default function EditCompany() {
   };
 
   const handleAddDepartment = () => {
-    setEditingDepartment(null);
-    departmentForm.reset({
-      name: "",
-      description: "",
-      managerId: undefined,
-      isActive: true,
-    });
-    setShowDepartmentForm(true);
+    // Redirect to create department page with return URL
+    setLocation(`/departments/create?returnTo=${encodeURIComponent("/company/edit")}`);
   };
 
   const handleCancel = () => {
@@ -653,13 +625,11 @@ export default function EditCompany() {
         </div>
       </div>
 
-      {/* Department Form Modal */}
-      {showDepartmentForm && (
+      {/* Department Edit Modal - Only for editing existing departments */}
+      {showDepartmentForm && editingDepartment && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">
-              {editingDepartment ? "Edit Department" : "Add Department"}
-            </h3>
+            <h3 className="text-lg font-semibold mb-4">Edit Department</h3>
             <Form {...departmentForm}>
               <form onSubmit={departmentForm.handleSubmit(handleDepartmentSubmit)} className="space-y-4">
                 <FormField
@@ -705,12 +675,10 @@ export default function EditCompany() {
                   </Button>
                   <Button 
                     type="submit" 
-                    disabled={createDepartmentMutation.isPending || updateDepartmentMutation.isPending}
+                    disabled={updateDepartmentMutation.isPending}
                     data-testid="button-save-department"
                   >
-                    {(createDepartmentMutation.isPending || updateDepartmentMutation.isPending) 
-                      ? "Saving..." 
-                      : editingDepartment ? "Update Department" : "Add Department"}
+                    {updateDepartmentMutation.isPending ? "Saving..." : "Update Department"}
                   </Button>
                 </div>
               </form>

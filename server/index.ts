@@ -24,11 +24,16 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+        const jsonStr = JSON.stringify(capturedJsonResponse);
+        // Don't truncate error responses - we need to see the full error
+        if (res.statusCode >= 400) {
+          logLine += ` :: ${jsonStr}`;
+        } else {
+          logLine += ` :: ${jsonStr}`;
+          if (logLine.length > 200) {
+            logLine = logLine.slice(0, 199) + "…";
+          }
+        }
       }
 
       log(logLine);
@@ -61,7 +66,7 @@ app.use((req, res, next) => {
   // ALWAYS serve the app on port 5000
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = 5000;
+  const port = 3000;
   server.listen({
     port,
     host: "0.0.0.0",

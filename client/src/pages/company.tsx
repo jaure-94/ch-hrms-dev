@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Calendar, Edit } from "lucide-react";
+import { Building, MapPin, Phone, Mail, Globe, Users, Briefcase, Calendar, Edit, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,18 @@ import { useAuth } from "@/lib/auth";
 import { Link } from "wouter";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
+
+type DepartmentSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  managerId: string | null;
+  totalRoles: number;
+  filledRoles: number;
+  vacantRoles: number;
+  updatedAt: string;
+};
 
 export default function Company() {
   const { user } = useAuth();
@@ -26,7 +38,7 @@ export default function Company() {
   });
 
   // Fetch company departments
-  const { data: departments, isLoading: isLoadingDepartments } = useQuery({
+  const { data: departments, isLoading: isLoadingDepartments } = useQuery<DepartmentSummary[]>({
     queryKey: ['/api/companies', companyId, 'departments'],
     queryFn: async () => {
       const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/departments`);
@@ -327,23 +339,94 @@ export default function Company() {
             </div>
           ) : departments && departments.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {departments.map((department: any) => (
-                <Card key={department.id} className="hover:shadow-md transition-shadow" data-testid={`card-department-${department.id}`}>
-                  <CardContent className="p-4">
-                    <h4 className="font-semibold text-gray-900 mb-1" data-testid={`text-department-name-${department.id}`}>
-                      {department.name}
-                    </h4>
-                    <p className="text-sm text-gray-600 mb-2" data-testid={`text-department-description-${department.id}`}>
-                      {department.description || "No description provided"}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <Badge variant={department.isActive ? "default" : "secondary"} data-testid={`badge-department-status-${department.id}`}>
-                        {department.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {(departments as DepartmentSummary[]).map((department) => {
+                const totalRoles = department.totalRoles || 0;
+                const filledRoles = department.filledRoles || 0;
+                const vacantRoles = department.vacantRoles || Math.max(totalRoles - filledRoles, 0);
+                const coverage = totalRoles > 0 ? Math.round((filledRoles / totalRoles) * 100) : 0;
+                const hasVacancies = vacantRoles > 0;
+
+                return (
+                  <Card key={department.id} className="hover:shadow-lg transition-shadow" data-testid={`card-department-${department.id}`}>
+                    <CardContent className="p-5 space-y-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-semibold text-gray-900 mb-1" data-testid={`text-department-name-${department.id}`}>
+                            {department.name}
+                          </h4>
+                          <p className="text-sm text-gray-600" data-testid={`text-department-description-${department.id}`}>
+                            {department.description || "No description provided"}
+                          </p>
+                        </div>
+                        <Badge variant={department.isActive ? "default" : "secondary"} data-testid={`badge-department-status-${department.id}`}>
+                          {department.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Role coverage</span>
+                          <span className="font-semibold text-gray-900">{coverage}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div
+                            className={`h-full rounded-full transition-all ${hasVacancies ? "bg-blue-600" : "bg-emerald-500"}`}
+                            style={{ width: `${coverage}%` }}
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-center">
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-gray-500">Roles</p>
+                            <p className="text-base font-semibold text-gray-900" data-testid={`text-department-total-roles-${department.id}`}>
+                              {totalRoles}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-gray-500">Filled</p>
+                            <p className="text-base font-semibold text-gray-900" data-testid={`text-department-filled-roles-${department.id}`}>
+                              {filledRoles}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-slate-100 bg-slate-50 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-gray-500">Vacant</p>
+                            <p className={`text-base font-semibold ${hasVacancies ? "text-amber-600" : "text-emerald-600"}`} data-testid={`text-department-vacant-roles-${department.id}`}>
+                              {vacantRoles}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center gap-1.5 text-sm">
+                          {hasVacancies ? (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-amber-500" />
+                              <span className="text-amber-700 font-medium">{vacantRoles} vacancies</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                              <span className="text-emerald-700 font-medium">Fully staffed</span>
+                            </>
+                          )}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          asChild
+                          data-testid={`button-department-view-${department.id}`}
+                        >
+                          <Link href={`/departments/${department.id}`}>
+                            View details
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8">
@@ -353,8 +436,11 @@ export default function Company() {
               <Button 
                 variant="outline"
                 data-testid="button-add-first-department"
+                asChild
               >
-                Add First Department
+                <Link href="/departments/create?returnTo=/company">
+                  Add First Department
+                </Link>
               </Button>
             </div>
           )}

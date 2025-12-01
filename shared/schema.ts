@@ -1,4 +1,4 @@
-import { pgTable, text, serial, uuid, timestamp, decimal, boolean, jsonb, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, decimal, boolean, jsonb, integer, index, pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -22,6 +22,7 @@ export const departments = pgTable("departments", {
   id: uuid("id").primaryKey().defaultRandom(),
   companyId: uuid("company_id").references(() => companies.id).notNull(),
   name: text("name").notNull(),
+  departmentId: text("department_id").unique(), // Human-readable department identifier
   description: text("description"),
   managerId: uuid("manager_id"),
   isActive: boolean("is_active").default(true),
@@ -107,6 +108,23 @@ export const employees = pgTable("employees", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const jobRoleStatusEnum = pgEnum("job_role_status", ["vacant", "filled"]);
+
+export const jobRoles = pgTable("job_roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  departmentId: uuid("department_id").references(() => departments.id).notNull(),
+  title: text("title").notNull(),
+  jobId: text("job_id").notNull().unique(),
+  description: text("description"),
+  status: jobRoleStatusEnum("status").notNull().default("vacant"),
+  assignedEmployeeId: uuid("assigned_employee_id").references(() => employees.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (jobRoles) => ({
+  departmentIdx: index("job_roles_department_id_idx").on(jobRoles.departmentId),
+  statusIdx: index("job_roles_status_idx").on(jobRoles.status),
+}));
+
 export const employments = pgTable("employments", {
   id: uuid("id").primaryKey().defaultRandom(),
   employeeId: uuid("employee_id").references(() => employees.id).notNull(),
@@ -185,6 +203,7 @@ export const departmentRelations = relations(departments, ({ one, many }) => ({
     references: [users.id],
   }),
   employees: many(employees),
+  jobRoles: many(jobRoles),
 }));
 
 export const companySettingsRelations = relations(companySettings, ({ one }) => ({
@@ -228,6 +247,7 @@ export const employeeRelations = relations(employees, ({ one, many }) => ({
   }),
   employments: many(employments),
   contracts: many(contracts),
+  jobRoles: many(jobRoles),
 }));
 
 export const employmentRelations = relations(employments, ({ one }) => ({
@@ -264,6 +284,17 @@ export const contractRelations = relations(contracts, ({ one }) => ({
   }),
 }));
 
+export const jobRoleRelations = relations(jobRoles, ({ one }) => ({
+  department: one(departments, {
+    fields: [jobRoles.departmentId],
+    references: [departments.id],
+  }),
+  assignedEmployee: one(employees, {
+    fields: [jobRoles.assignedEmployeeId],
+    references: [employees.id],
+  }),
+}));
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   createdAt: true,
@@ -292,6 +323,14 @@ export const insertContractSchema = createInsertSchema(contracts).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertJobRoleSchema = createInsertSchema(jobRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  status: z.enum(["vacant", "filled"]).default("vacant"),
 });
 
 export const insertDepartmentSchema = createInsertSchema(departments).omit({
@@ -360,6 +399,7 @@ export type Employee = typeof employees.$inferSelect;
 export type Employment = typeof employments.$inferSelect;
 export type ContractTemplate = typeof contractTemplates.$inferSelect;
 export type Contract = typeof contracts.$inferSelect;
+export type JobRole = typeof jobRoles.$inferSelect;
 
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
@@ -371,6 +411,7 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export type InsertEmployment = z.infer<typeof insertEmploymentSchema>;
 export type InsertContractTemplate = z.infer<typeof insertContractTemplateSchema>;
 export type InsertContract = z.infer<typeof insertContractSchema>;
+export type InsertJobRole = z.infer<typeof insertJobRoleSchema>;
 
 export type LoginData = z.infer<typeof loginSchema>;
 export type SignupData = z.infer<typeof signupSchema>;

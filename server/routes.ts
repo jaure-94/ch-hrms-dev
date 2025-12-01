@@ -16,14 +16,17 @@ import {
   employees,
   employments,
   refreshTokens,
+  jobRoles,
+  insertJobRoleSchema,
   type User,
   type Role,
-  type Company
+  type Company,
+  type JobRole
 } from "@shared/schema";
 import { z } from "zod";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import { db } from "./db";
-import { eq, and, or, ilike, count } from "drizzle-orm";
+import { eq, and, or, ilike, count, sql } from "drizzle-orm";
 import { 
   authenticateUser, 
   hashPassword, 
@@ -87,6 +90,25 @@ const employeeFormSchema = z.object({
   
   // Company
   companyId: z.string().uuid("Invalid company ID"),
+  jobRoleId: z.string().uuid("Invalid job role ID").optional(),
+});
+const jobRoleIdSchema = z.object({
+  id: z.string().uuid("Invalid job role ID format"),
+});
+
+const jobRoleBaseSchema = z.object({
+  title: z.string().min(1, "Title is required").max(150),
+  jobId: z.string().min(1, "Job ID is required").max(50).regex(/^[A-Za-z0-9-_]+$/, "Job ID can only contain letters, numbers, hyphens, or underscores"),
+  description: z.string().optional(),
+});
+
+const createJobRoleSchema = jobRoleBaseSchema.extend({
+  status: z.enum(["vacant", "filled"]).optional().default("vacant"),
+});
+
+const updateJobRoleSchema = jobRoleBaseSchema.partial().extend({
+  status: z.enum(["vacant", "filled"]).optional(),
+  assignedEmployeeId: z.string().uuid("Invalid employee ID").nullable().optional(),
 });
 
 // User management validation schemas
@@ -138,6 +160,36 @@ async function countActiveAdmins(companyId: string): Promise<number> {
     );
   
   return result[0]?.count || 0;
+}
+
+async function getDepartmentWithCompany(departmentId: string) {
+  const result = await db
+    .select({
+      department: departments,
+      company: companies,
+    })
+    .from(departments)
+    .innerJoin(companies, eq(departments.companyId, companies.id))
+    .where(eq(departments.id, departmentId))
+    .limit(1);
+
+  return result[0];
+}
+
+async function getJobRoleWithDepartment(jobRoleId: string) {
+  const result = await db
+    .select({
+      jobRole: jobRoles,
+      department: departments,
+      company: companies,
+    })
+    .from(jobRoles)
+    .innerJoin(departments, eq(jobRoles.departmentId, departments.id))
+    .innerJoin(companies, eq(departments.companyId, companies.id))
+    .where(eq(jobRoles.id, jobRoleId))
+    .limit(1);
+
+  return result[0];
 }
 
 // Helper function to revoke all refresh tokens for a user
@@ -1490,55 +1542,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/employees", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const validatedData = employeeFormSchema.parse(req.body);
-      
-      const employeeData = {
-        companyId: validatedData.companyId,
-        firstName: validatedData.firstName,
-        lastName: validatedData.lastName,
-        email: validatedData.email,
-        phone: validatedData.phoneNumber,
-        address: validatedData.address,
-        dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : undefined,
-        nationalInsuranceNumber: validatedData.nationalInsuranceNumber,
-        gender: validatedData.gender,
-        maritalStatus: validatedData.maritalStatus,
-        emergencyContact: {
-          name: validatedData.emergencyContactName,
-          phone: validatedData.emergencyContactPhone,
-          relationship: validatedData.emergencyContactRelationship,
-        },
-        // VISA/Immigration fields
-        passportNumber: validatedData.passportNumber,
-        passportIssueDate: validatedData.passportIssueDate ? new Date(validatedData.passportIssueDate) : undefined,
-        passportExpiryDate: validatedData.passportExpiryDate ? new Date(validatedData.passportExpiryDate) : undefined,
-        visaIssueDate: validatedData.visaIssueDate ? new Date(validatedData.visaIssueDate) : undefined,
-        visaExpiryDate: validatedData.visaExpiryDate ? new Date(validatedData.visaExpiryDate) : undefined,
-        visaCategory: validatedData.visaCategory,
-        dbsCertificateNumber: validatedData.dbsCertificateNumber,
-      };
+      let selectedJobRoleRecord:
+        | {
+            jobRole: JobRole;
+            department: typeof departments.$inferSelect;
+            company: Company;
+          }
+        | null = null;
 
-      const employmentData = {
-        companyId: validatedData.companyId,
-        employeeId: "", // Will be set by the storage method
-        jobTitle: validatedData.jobTitle,
-        department: validatedData.department,
-        manager: validatedData.manager,
-        employmentStatus: validatedData.employmentStatus,
-        baseSalary: validatedData.baseSalary,
-        payFrequency: validatedData.payFrequency,
-        startDate: new Date(validatedData.startDate),
-        location: validatedData.location,
-        weeklyHours: validatedData.weeklyHours,
-        paymentMethod: validatedData.paymentMethod,
-        taxCode: validatedData.taxCode,
-        benefits: validatedData.benefits,
-      };
+      if (validatedData.jobRoleId) {
+        selectedJobRoleRecord = await getJobRoleWithDepartment(validatedData.jobRoleId);
 
-      const employee = await storage.createEmployeeWithEmployment(employeeData, employmentData);
-      res.status(201).json(employee);
+        if (!selectedJobRoleRecord) {
+          return res.status(404).json({ error: "Selected job role does not exist" });
+        }
+
+        if (selectedJobRoleRecord.company.id !== validatedData.companyId) {
+          return res.status(400).json({ error: "Job role belongs to a different company" });
+        }
+
+        if (selectedJobRoleRecord.jobRole.status !== "vacant" || selectedJobRoleRecord.jobRole.assignedEmployeeId) {
+          return res.status(400).json({ error: "Job role is no longer available" });
+        }
+      }
+
+      const createdEmployee = await db.transaction(async (tx) => {
+        const employeeData = {
+          companyId: validatedData.companyId,
+          firstName: validatedData.firstName,
+          lastName: validatedData.lastName,
+          email: validatedData.email,
+          phone: validatedData.phoneNumber,
+          address: validatedData.address,
+          dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : undefined,
+          nationalInsuranceNumber: validatedData.nationalInsuranceNumber,
+          gender: validatedData.gender,
+          maritalStatus: validatedData.maritalStatus,
+          emergencyContact: {
+            name: validatedData.emergencyContactName,
+            phone: validatedData.emergencyContactPhone,
+            relationship: validatedData.emergencyContactRelationship,
+          },
+          passportNumber: validatedData.passportNumber,
+          passportIssueDate: validatedData.passportIssueDate ? new Date(validatedData.passportIssueDate) : undefined,
+          passportExpiryDate: validatedData.passportExpiryDate ? new Date(validatedData.passportExpiryDate) : undefined,
+          visaIssueDate: validatedData.visaIssueDate ? new Date(validatedData.visaIssueDate) : undefined,
+          visaExpiryDate: validatedData.visaExpiryDate ? new Date(validatedData.visaExpiryDate) : undefined,
+          visaCategory: validatedData.visaCategory,
+          dbsCertificateNumber: validatedData.dbsCertificateNumber,
+        };
+
+        const [newEmployee] = await tx.insert(employees).values(employeeData).returning();
+
+        const employmentData = {
+          companyId: validatedData.companyId,
+          employeeId: newEmployee.id,
+          jobTitle: validatedData.jobTitle,
+          department: selectedJobRoleRecord ? selectedJobRoleRecord.department.name : validatedData.department,
+          manager: validatedData.manager,
+          employmentStatus: validatedData.employmentStatus,
+          baseSalary: validatedData.baseSalary,
+          payFrequency: validatedData.payFrequency,
+          startDate: new Date(validatedData.startDate),
+          location: validatedData.location,
+          weeklyHours: validatedData.weeklyHours,
+          paymentMethod: validatedData.paymentMethod,
+          taxCode: validatedData.taxCode,
+          benefits: validatedData.benefits,
+        };
+
+        const [newEmployment] = await tx.insert(employments).values(employmentData).returning();
+
+        if (selectedJobRoleRecord) {
+          const [updatedJobRole] = await tx
+            .update(jobRoles)
+            .set({
+              status: "filled",
+              assignedEmployeeId: newEmployee.id,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(jobRoles.id, selectedJobRoleRecord.jobRole.id), eq(jobRoles.status, "vacant")))
+            .returning();
+
+          if (!updatedJobRole) {
+            throw new Error("JOB_ROLE_NO_LONGER_AVAILABLE");
+          }
+        }
+
+        const [companyRecord] = await tx
+          .select()
+          .from(companies)
+          .where(eq(companies.id, validatedData.companyId))
+          .limit(1);
+
+        return {
+          employee: newEmployee,
+          employment: newEmployment,
+          company: companyRecord!,
+        };
+      });
+
+      res.status(201).json({
+        ...createdEmployee.employee,
+        employment: createdEmployee.employment,
+        company: createdEmployee.company,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid employee data", errors: error.errors });
+      }
+      if (error instanceof Error && error.message === "JOB_ROLE_NO_LONGER_AVAILABLE") {
+        return res.status(409).json({ error: "Job role was filled while creating the employee. Please pick a different role." });
       }
       res.status(500).json({ message: "Failed to create employee" });
     }
@@ -1598,6 +1712,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (employment) {
         await storage.deleteEmployment(employment.id);
       }
+      await db
+        .update(jobRoles)
+        .set({
+          status: "vacant",
+          assignedEmployeeId: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(jobRoles.assignedEmployeeId, req.params.id));
       await storage.deleteEmployee(req.params.id);
       res.status(204).send();
     } catch (error) {
@@ -2129,12 +2251,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const departmentsList = await db
-        .select()
+        .select({
+          id: departments.id,
+          name: departments.name,
+          description: departments.description,
+          managerId: departments.managerId,
+          isActive: departments.isActive,
+          createdAt: departments.createdAt,
+          updatedAt: departments.updatedAt,
+          totalRoles: sql<number>`coalesce(count(${jobRoles.id}), 0)`,
+          filledRoles: sql<number>`coalesce(sum(case when ${jobRoles.status} = 'filled' then 1 else 0 end), 0)`,
+        })
         .from(departments)
+        .leftJoin(jobRoles, eq(jobRoles.departmentId, departments.id))
         .where(eq(departments.companyId, companyId))
+        .groupBy(departments.id)
         .orderBy(departments.name);
 
-      res.json(departmentsList);
+      const normalized = departmentsList.map((dept) => {
+        const totalRoles = Number(dept.totalRoles) || 0;
+        const filledRoles = Number(dept.filledRoles) || 0;
+        const vacantRoles = Math.max(totalRoles - filledRoles, 0);
+
+        return {
+          id: dept.id,
+          name: dept.name,
+          description: dept.description,
+          managerId: dept.managerId,
+          isActive: dept.isActive,
+          createdAt: dept.createdAt,
+          updatedAt: dept.updatedAt,
+          totalRoles,
+          filledRoles,
+          vacantRoles,
+        };
+      });
+
+      res.json(normalized);
     } catch (error) {
       console.error('Failed to fetch departments:', error);
       res.status(500).json({ error: "Failed to fetch departments" });
@@ -2155,23 +2308,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Insufficient permissions for department management" });
       }
 
-      // Input validation
+      // Input validation - handle optional fields that may be empty strings
       const createDepartmentSchema = z.object({
         name: z.string().min(1, "Department name is required").max(100, "Department name too long"),
-        description: z.string().optional(),
-        managerId: z.string().uuid().optional(),
+        departmentId: z.preprocess(
+          (val) => val === "" || val === null || val === undefined ? undefined : val,
+          z.string()
+            .max(50, "Department ID too long")
+            .regex(/^[A-Za-z0-9-_]*$/, "Only letters, numbers, hyphens, underscores allowed")
+            .optional()
+        ),
+        description: z.preprocess(
+          (val) => val === "" || val === null || val === undefined ? undefined : val,
+          z.string().optional()
+        ),
+        managerId: z.preprocess(
+          (val) => val === "" || val === null || val === undefined ? undefined : val,
+          z.string().uuid("Invalid manager ID format").optional()
+        ),
         isActive: z.boolean().default(true),
       });
 
+      console.log("=== DEPARTMENT CREATION REQUEST ===");
+      console.log("Company ID:", req.params.companyId);
+      console.log("Request Body:", JSON.stringify(req.body, null, 2));
+      console.log("Request Body Type:", typeof req.body);
+      console.log("Request Body Keys:", Object.keys(req.body || {}));
+
       const bodyValidation = createDepartmentSchema.safeParse(req.body);
       if (!bodyValidation.success) {
+        console.error("=== VALIDATION FAILED ===");
+        console.error("Validation Errors:", JSON.stringify(bodyValidation.error.errors, null, 2));
+        console.error("Error Format:", bodyValidation.error.format());
         return res.status(400).json({ 
           error: "Invalid request data", 
-          details: bodyValidation.error.errors 
+          details: bodyValidation.error.errors,
+          receivedBody: req.body,
+          format: bodyValidation.error.format()
         });
       }
+      
+      console.log("=== VALIDATION SUCCESS ===");
+      console.log("Validated Data:", JSON.stringify(bodyValidation.data, null, 2));
 
-      // Check if department name already exists for this company
+      // Check if department name or departmentId already exists for this company
+      if (bodyValidation.data.departmentId) {
+        const existingDeptById = await db
+          .select()
+          .from(departments)
+          .where(eq(departments.departmentId, bodyValidation.data.departmentId))
+          .limit(1);
+        
+        if (existingDeptById.length > 0) {
+          return res.status(400).json({ error: "Department ID already exists" });
+        }
+      }
+
       const existingDepartment = await db
         .select()
         .from(departments)
@@ -2186,18 +2378,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Create department
-      const newDepartment = await db
-        .insert(departments)
-        .values({
-          companyId,
-          ...bodyValidation.data,
-        })
-        .returning();
+      // Normalize and clean the data
+      const insertData: any = {
+        companyId,
+        name: bodyValidation.data.name.trim(),
+        description: (bodyValidation.data.description && bodyValidation.data.description.trim().length > 0) 
+          ? bodyValidation.data.description.trim() 
+          : null,
+        isActive: bodyValidation.data.isActive ?? true,
+      };
 
-      res.status(201).json(newDepartment[0]);
-    } catch (error) {
-      console.error('Failed to create department:', error);
-      res.status(500).json({ error: "Failed to create department" });
+      // Only include departmentId if it's provided and not empty
+      if (bodyValidation.data.departmentId && 
+          typeof bodyValidation.data.departmentId === 'string' && 
+          bodyValidation.data.departmentId.trim().length > 0) {
+        insertData.departmentId = bodyValidation.data.departmentId.trim();
+      }
+
+      console.log("Inserting department with data:", insertData);
+
+      try {
+        const newDepartment = await db
+          .insert(departments)
+          .values(insertData)
+          .returning();
+
+        console.log("Department created successfully:", newDepartment[0].id);
+        res.status(201).json(newDepartment[0]);
+      } catch (dbError: any) {
+        console.error('Database error creating department:', {
+          code: dbError.code,
+          message: dbError.message,
+          detail: dbError.detail,
+          constraint: dbError.constraint,
+          table: dbError.table,
+          column: dbError.column,
+          fullError: dbError
+        });
+
+        // Handle specific database errors
+        if (dbError.code === '42703') { // Undefined column
+          return res.status(500).json({ 
+            error: "Database schema mismatch. The department_id column may not exist. Please run database migration: npm run db:push",
+            details: dbError.message
+          });
+        }
+        if (dbError.code === '23505') { // PostgreSQL unique constraint violation
+          const constraint = dbError.constraint || '';
+          if (constraint.includes('department_id')) {
+            return res.status(400).json({ 
+              error: "Department ID already exists. Please choose a different ID." 
+            });
+          }
+          return res.status(400).json({ 
+            error: "A department with this information already exists." 
+          });
+        }
+        if (dbError.code === '23503') { // Foreign key constraint violation
+          return res.status(400).json({ 
+            error: "Invalid company ID or manager ID." 
+          });
+        }
+        
+        // Re-throw to outer catch for generic handling
+        throw dbError;
+      }
+    } catch (error: any) {
+      console.error('Failed to create department:', {
+        error,
+        message: error?.message,
+        stack: error?.stack
+      });
+      
+      // If error was already handled above, return early
+      if (error.code && ['42703', '23505', '23503'].includes(error.code)) {
+        return; // Response already sent
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to create department",
+        details: error.message || String(error),
+        code: error.code || 'UNKNOWN_ERROR'
+      });
     }
   });
 
@@ -2304,15 +2566,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Insufficient permissions for department management" });
       }
 
-      // TODO: Check if department has employees assigned and handle accordingly
-      // For now, we'll allow deletion but could add a soft delete approach
-
+      await db.delete(jobRoles).where(eq(jobRoles.departmentId, id));
       await db.delete(departments).where(eq(departments.id, id));
 
       res.json({ message: "Department deleted successfully" });
     } catch (error) {
       console.error('Failed to delete department:', error);
       res.status(500).json({ error: "Failed to delete department" });
+    }
+  });
+
+  app.get("/api/departments/:id/details", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const departmentRecord = await getDepartmentWithCompany(id);
+
+      if (!departmentRecord) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== departmentRecord.company.id) {
+        return res.status(403).json({ error: "Access denied to this department" });
+      }
+
+      const departmentJobRoles = await db
+        .select()
+        .from(jobRoles)
+        .where(eq(jobRoles.departmentId, id))
+        .orderBy(jobRoles.title);
+
+      res.json({
+        ...departmentRecord.department,
+        company: departmentRecord.company,
+        jobRoles: departmentJobRoles,
+      });
+    } catch (error) {
+      console.error("Failed to fetch department details:", error);
+      res.status(500).json({ error: "Failed to fetch department details" });
+    }
+  });
+
+  app.get("/api/departments/:id/job-roles", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const departmentRecord = await getDepartmentWithCompany(id);
+
+      if (!departmentRecord) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== departmentRecord.company.id) {
+        return res.status(403).json({ error: "Access denied to this department" });
+      }
+
+      const departmentJobRoles = await db
+        .select()
+        .from(jobRoles)
+        .where(eq(jobRoles.departmentId, id))
+        .orderBy(jobRoles.title);
+
+      res.json(departmentJobRoles);
+    } catch (error) {
+      console.error("Failed to fetch job roles:", error);
+      res.status(500).json({ error: "Failed to fetch job roles" });
+    }
+  });
+
+  app.post("/api/departments/:id/job-roles", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const departmentRecord = await getDepartmentWithCompany(id);
+
+      if (!departmentRecord) {
+        return res.status(404).json({ error: "Department not found" });
+      }
+
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== departmentRecord.company.id) {
+        return res.status(403).json({ error: "Access denied to this department" });
+      }
+
+      if (req.user!.roleLevel > ROLE_LEVELS.ADMIN) {
+        return res.status(403).json({ error: "Insufficient permissions for job role management" });
+      }
+
+      const bodyValidation = createJobRoleSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({
+          error: "Invalid request data",
+          details: bodyValidation.error.errors,
+        });
+      }
+
+      const duplicateJobRole = await db
+        .select({ id: jobRoles.id })
+        .from(jobRoles)
+        .where(eq(jobRoles.jobId, bodyValidation.data.jobId))
+        .limit(1);
+
+      if (duplicateJobRole.length > 0) {
+        return res.status(400).json({ error: "Job ID already exists. Please choose a unique ID." });
+      }
+
+      const [newJobRole] = await db
+        .insert(jobRoles)
+        .values({
+          departmentId: id,
+          title: bodyValidation.data.title,
+          jobId: bodyValidation.data.jobId,
+          description: bodyValidation.data.description || null,
+          status: bodyValidation.data.status || "vacant",
+        })
+        .returning();
+
+      res.status(201).json(newJobRole);
+    } catch (error) {
+      console.error("Failed to create job role:", error);
+      res.status(500).json({ error: "Failed to create job role" });
+    }
+  });
+
+  app.patch("/api/job-roles/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const jobRoleRecord = await getJobRoleWithDepartment(id);
+
+      if (!jobRoleRecord) {
+        return res.status(404).json({ error: "Job role not found" });
+      }
+
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== jobRoleRecord.company.id) {
+        return res.status(403).json({ error: "Access denied to this job role" });
+      }
+
+      if (req.user!.roleLevel > ROLE_LEVELS.ADMIN) {
+        return res.status(403).json({ error: "Insufficient permissions for job role management" });
+      }
+
+      const bodyValidation = updateJobRoleSchema.safeParse(req.body);
+      if (!bodyValidation.success) {
+        return res.status(400).json({
+          error: "Invalid request data",
+          details: bodyValidation.error.errors,
+        });
+      }
+
+      const updates: Partial<JobRole> = {};
+
+      if (bodyValidation.data.title) {
+        updates.title = bodyValidation.data.title;
+      }
+
+      if (bodyValidation.data.jobId && bodyValidation.data.jobId !== jobRoleRecord.jobRole.jobId) {
+        const duplicateJobRole = await db
+          .select({ id: jobRoles.id })
+          .from(jobRoles)
+          .where(eq(jobRoles.jobId, bodyValidation.data.jobId))
+          .limit(1);
+
+        if (duplicateJobRole.length > 0) {
+          return res.status(400).json({ error: "Job ID already exists. Please choose a unique ID." });
+        }
+
+        updates.jobId = bodyValidation.data.jobId;
+      }
+
+      if (bodyValidation.data.description !== undefined) {
+        updates.description = bodyValidation.data.description;
+      }
+
+      let assignedEmployeeId = bodyValidation.data.assignedEmployeeId ?? jobRoleRecord.jobRole.assignedEmployeeId;
+      let status = bodyValidation.data.status ?? jobRoleRecord.jobRole.status;
+
+      if (bodyValidation.data.assignedEmployeeId && !bodyValidation.data.status) {
+        status = "filled";
+      }
+
+      if (bodyValidation.data.status === "vacant") {
+        assignedEmployeeId = null;
+      }
+
+      if (status === "filled") {
+        if (!assignedEmployeeId) {
+          return res.status(400).json({ error: "A filled role must be linked to an employee" });
+        }
+
+        const [assignedEmployee] = await db
+          .select({
+            id: employees.id,
+            companyId: employees.companyId,
+          })
+          .from(employees)
+          .where(eq(employees.id, assignedEmployeeId))
+          .limit(1);
+
+        if (!assignedEmployee) {
+          return res.status(404).json({ error: "Assigned employee not found" });
+        }
+
+        if (assignedEmployee.companyId !== jobRoleRecord.company.id) {
+          return res.status(400).json({ error: "Employee must belong to the same company as the job role" });
+        }
+      }
+
+      updates.assignedEmployeeId = assignedEmployeeId ?? null;
+      updates.status = status;
+      updates.updatedAt = new Date();
+
+      const [updatedJobRole] = await db
+        .update(jobRoles)
+        .set(updates)
+        .where(eq(jobRoles.id, id))
+        .returning();
+
+      res.json(updatedJobRole);
+    } catch (error) {
+      console.error("Failed to update job role:", error);
+      res.status(500).json({ error: "Failed to update job role" });
+    }
+  });
+
+  app.delete("/api/job-roles/:id", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const jobRoleRecord = await getJobRoleWithDepartment(id);
+
+      if (!jobRoleRecord) {
+        return res.status(404).json({ error: "Job role not found" });
+      }
+
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== jobRoleRecord.company.id) {
+        return res.status(403).json({ error: "Access denied to this job role" });
+      }
+
+      if (req.user!.roleLevel > ROLE_LEVELS.ADMIN) {
+        return res.status(403).json({ error: "Insufficient permissions for job role management" });
+      }
+
+      await db.delete(jobRoles).where(eq(jobRoles.id, id));
+
+      res.json({ message: "Job role deleted successfully" });
+    } catch (error) {
+      console.error("Failed to delete job role:", error);
+      res.status(500).json({ error: "Failed to delete job role" });
     }
   });
 

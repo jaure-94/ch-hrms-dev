@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -37,7 +37,7 @@ const companySizeOptions = [
 
 export default function Signup() {
   const [, setLocation] = useLocation();
-  const { signup } = useAuth();
+  const { signup, user, isAuthenticated } = useAuth();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -72,6 +72,12 @@ export default function Signup() {
     control: form.control,
     name: "company.departments"
   });
+
+  useEffect(() => {
+    if (isAuthenticated && user && user.role.name === 'superuser' && !user.company.setupCompleted) {
+      setShowSuccessModal(true);
+    }
+  }, [isAuthenticated, user]);
 
   const onSubmit = async (data: SignupFormData) => {
     setError('');
@@ -565,6 +571,13 @@ export default function Signup() {
                 Welcome to our HR management platform! Your company account has been set up and you're ready to start managing your team.
               </DialogDescription>
             </DialogHeader>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-left text-sm text-slate-600">
+              <p className="font-semibold text-slate-900 mb-2">What happens next?</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Complete your company profile so your team can start onboarding.</li>
+                <li>You can pause here and sign in later—your progress is saved.</li>
+              </ul>
+            </div>
             <div className="flex flex-col gap-3 mt-6">
               <Button 
                 onClick={() => setLocation('/company-setup')}

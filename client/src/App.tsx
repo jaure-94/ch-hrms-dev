@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,7 @@ import Signup from "@/pages/signup";
 import CompanySetup from "@/pages/company-setup";
 import Dashboard from "@/pages/dashboard";
 import Company from "@/pages/company";
+import DepartmentDetails from "@/pages/department-details";
 import Onboarding from "@/pages/onboarding";
 import Employees from "@/pages/employees";
 import Contracts from "@/pages/contracts";
@@ -23,6 +24,8 @@ import EditUser from "@/pages/edit-user";
 import UserProfile from "@/pages/user-profile";
 import CreateUser from "@/pages/create-user";
 import EditCompany from "@/pages/edit-company";
+import EditDepartment from "@/pages/edit-department";
+import CreateDepartment from "@/pages/create-department";
 import Sidebar from "@/components/sidebar";
 
 // Public routes (no authentication required)
@@ -69,6 +72,22 @@ function ProtectedRouter() {
           <Route path="/company">
             <ProtectedRoute requiredRoleLevel={2}>
               <Company />
+            </ProtectedRoute>
+          </Route>
+          {/* Specific routes must come before parameterized routes */}
+          <Route path="/departments/create">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <CreateDepartment />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/departments/:id/edit">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <EditDepartment />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/departments/:id">
+            <ProtectedRoute requiredRoleLevel={2}>
+              <DepartmentDetails />
             </ProtectedRoute>
           </Route>
           <Route path="/company/edit">
@@ -149,7 +168,8 @@ function ProtectedRouter() {
 
 // Main router that switches between public and protected routes
 function MainRouter() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const [location] = useLocation();
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -164,6 +184,16 @@ function MainRouter() {
   }
 
   // Switch between authenticated and public views
+  const stayOnSignup =
+    location === "/signup" &&
+    isAuthenticated &&
+    user?.role.name === "superuser" &&
+    user?.company.setupCompleted === false;
+
+  if (stayOnSignup) {
+    return <Signup />;
+  }
+
   return isAuthenticated ? <ProtectedRouter /> : <PublicRouter />;
 }
 
