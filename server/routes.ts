@@ -52,6 +52,13 @@ import {
 
 const employeeFormSchema = z.object({
   // Personal Information
+  employeeId: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.string()
+      .max(50, "Employee ID too long")
+      .regex(/^[A-Za-z0-9-_]*$/, "Only letters, numbers, hyphens, underscores allowed")
+      .optional()
+  ),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
@@ -1569,6 +1576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const createdEmployee = await db.transaction(async (tx) => {
         const employeeData = {
           companyId: validatedData.companyId,
+          employeeId: validatedData.employeeId,
           firstName: validatedData.firstName,
           lastName: validatedData.lastName,
           email: validatedData.email,
@@ -1647,13 +1655,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         employment: createdEmployee.employment,
         company: createdEmployee.company,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid employee data", errors: error.errors });
       }
       if (error instanceof Error && error.message === "JOB_ROLE_NO_LONGER_AVAILABLE") {
         return res.status(409).json({ error: "Job role was filled while creating the employee. Please pick a different role." });
       }
+      // Handle unique constraint violations
+      if (error?.code === "23505") {
+        if (error?.constraint === "employees_employee_id_unique") {
+          return res.status(409).json({ error: "Employee ID already exists. Please use a different Employee ID." });
+        }
+        if (error?.constraint === "employees_email_unique") {
+          return res.status(409).json({ error: "Email address already exists. Please use a different email." });
+        }
+      }
+      console.error("Failed to create employee:", error);
       res.status(500).json({ message: "Failed to create employee" });
     }
   });
@@ -2629,6 +2647,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Failed to fetch job roles:", error);
       res.status(500).json({ error: "Failed to fetch job roles" });
+    }
+  });
+
+  // Get all job roles for a company (for onboarding form)
+  app.get("/api/companies/:companyId/job-roles", authenticateToken, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const { status } = req.query; // Optional status filter (e.g., ?status=vacant)
+      
+      console.log(`[GET /api/companies/${companyId}/job-roles] Request received. Status filter: ${status}`);
+      console.log(`[GET /api/companies/${companyId}/job-roles] User: ${req.user!.email}, Company: ${req.user!.companyId}, Role Level: ${req.user!.roleLevel}`);
+      
+      // Ensure user can access this company
+      if (req.user!.roleLevel !== ROLE_LEVELS.SUPERUSER && req.user!.companyId !== companyId) {
+        console.log(`[GET /api/companies/${companyId}/job-roles] Access denied - company mismatch`);
+        return res.status(403).json({ error: "Access denied to this company" });
+      }
+
+      // Build where conditions: start with company filter via departments
+      const companyFilter = eq(departments.companyId, companyId);
+      
+      // Add status filter if provided
+      let whereCondition;
+      if (status === "vacant") {
+        whereCondition = and(
+          companyFilter,
+          eq(jobRoles.status, "vacant")
+        );
+        console.log(`[GET /api/companies/${companyId}/job-roles] Filtering for vacant roles`);
+      } else {
+        whereCondition = companyFilter;
+        console.log(`[GET /api/companies/${companyId}/job-roles] No status filter - returning all roles`);
+      }
+
+      // Query job roles directly, joining with departments to get company info
+      const companyJobRoles = await db
+        .select({
+          id: jobRoles.id,
+          title: jobRoles.title,
+          jobId: jobRoles.jobId,
+          description: jobRoles.description,
+          status: jobRoles.status,
+          departmentId: jobRoles.departmentId,
+          departmentName: departments.name,
+          departmentDepartmentId: departments.departmentId,
+        })
+        .from(jobRoles)
+        .innerJoin(departments, eq(jobRoles.departmentId, departments.id))
+        .where(whereCondition)
+        .orderBy(departments.name, jobRoles.title);
+
+      console.log(`[GET /api/companies/${companyId}/job-roles] Found ${companyJobRoles.length} job roles`);
+      if (companyJobRoles.length > 0) {
+        console.log(`[GET /api/companies/${companyId}/job-roles] Sample role:`, {
+          id: companyJobRoles[0].id,
+          title: companyJobRoles[0].title,
+          status: companyJobRoles[0].status,
+          departmentName: companyJobRoles[0].departmentName,
+        });
+      } else {
+        console.log(`[GET /api/companies/${companyId}/job-roles] No job roles found for this company`);
+      }
+
+      res.json(companyJobRoles);
+    } catch (error) {
+      console.error("[GET /api/companies/:companyId/job-roles] Failed to fetch company job roles:", error);
+      if (error instanceof Error) {
+        console.error("[GET /api/companies/:companyId/job-roles] Error message:", error.message);
+        console.error("[GET /api/companies/:companyId/job-roles] Error stack:", error.stack);
+      }
+      res.status(500).json({ error: "Failed to fetch job roles", details: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 

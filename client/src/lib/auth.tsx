@@ -107,9 +107,12 @@ export const authenticatedApiRequest = async (
 
   // Try with current token
   let res = await makeRequest(accessToken || undefined);
+  
+  console.log(`[authenticatedApiRequest] ${method} ${url} - Status: ${res.status}, Has token: ${!!accessToken}`);
 
   // If unauthorized, try to refresh (even if no current token)
   if (res.status === 401) {
+    console.log(`[authenticatedApiRequest] Got 401, attempting token refresh...`);
     // Use existing refresh promise or create new one
     if (!tokenRefreshPromise) {
       tokenRefreshPromise = refreshAccessToken();
@@ -119,14 +122,37 @@ export const authenticatedApiRequest = async (
     tokenRefreshPromise = null;
 
     if (refreshed) {
+      console.log(`[authenticatedApiRequest] Token refreshed successfully, retrying request...`);
       // Retry with new token
       res = await makeRequest(accessToken || undefined);
+      console.log(`[authenticatedApiRequest] Retry status: ${res.status}`);
+    } else {
+      console.error(`[authenticatedApiRequest] Token refresh failed`);
     }
   }
 
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = res.headers.get('content-type') || '';
+    const text = await res.text();
+    
+    // If we got HTML, it means the route doesn't exist or there's a server error
+    if (contentType.includes('text/html') || text.trim().startsWith('<!DOCTYPE')) {
+      console.error(`[authenticatedApiRequest] Received HTML instead of JSON for ${method} ${url}. Status: ${res.status}`);
+      console.error(`[authenticatedApiRequest] Response preview:`, text.substring(0, 500));
+      throw new Error(`Server returned HTML error page (Status ${res.status}). The API route may not exist or there's a server configuration issue.`);
+    }
+    
+    // Try to parse as JSON if it looks like JSON
+    let errorMessage = text;
+    try {
+      const jsonError = JSON.parse(text);
+      errorMessage = jsonError.message || jsonError.error || text;
+    } catch {
+      // Not JSON, use text as-is
+    }
+    
+    throw new Error(`${res.status}: ${errorMessage}`);
   }
 
   return res;
@@ -135,22 +161,27 @@ export const authenticatedApiRequest = async (
 // Token refresh utility
 const refreshAccessToken = async (): Promise<boolean> => {
   try {
-    console.log('Attempting token refresh...');
     const res = await apiRequest('POST', '/auth/refresh');
-    console.log('Refresh response status:', res.status);
     const data = await res.json();
-    console.log('Refresh response data:', data);
     
     if (data.accessToken) {
       setAccessToken(data.accessToken);
-      console.log('Token refresh successful');
+      // Only log success in development, without exposing the token
+      if (import.meta.env.DEV) {
+        console.log('[Auth] Token refresh successful');
+      }
       return true;
     }
-    console.log('No access token in response');
+    
+    if (import.meta.env.DEV) {
+      console.warn('[Auth] No access token in refresh response');
+    }
     return false;
   } catch (error) {
-    console.error('Token refresh failed:', error);
-    console.log('Full error object:', JSON.stringify(error));
+    // Log error without exposing sensitive data
+    if (import.meta.env.DEV) {
+      console.error('[Auth] Token refresh failed:', error instanceof Error ? error.message : 'Unknown error');
+    }
     clearAuth();
     return false;
   }
@@ -237,7 +268,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await apiRequest('POST', '/auth/logout');
     } catch (error) {
-      console.error('Logout error:', error);
+      // Log error without exposing sensitive data
+      if (import.meta.env.DEV) {
+        console.error('[Auth] Logout error:', error instanceof Error ? error.message : 'Unknown error');
+      }
     } finally {
       clearAuth();
       setAuthState({

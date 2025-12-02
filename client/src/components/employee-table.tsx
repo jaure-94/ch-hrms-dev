@@ -13,6 +13,7 @@ import EmployeeDetailsModal from "./employee-details-modal";
 
 interface Employee {
   id: string;
+  employeeId?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -159,6 +160,7 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
           <TableHeader>
             <TableRow>
               <TableHead>Employee</TableHead>
+              <TableHead>Employee ID</TableHead>
               <TableHead>Position</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Start Date</TableHead>
@@ -183,6 +185,11 @@ export default function EmployeeTable({ employees, isLoading, onDownloadContract
                       </div>
                     </div>
                   </div>
+                </TableCell>
+                <TableCell className="text-gray-900">
+                  {employee.employeeId || (
+                    <span className="text-gray-400 italic">N/A</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-gray-900">
                   {employee.employment?.jobTitle || 'N/A'}

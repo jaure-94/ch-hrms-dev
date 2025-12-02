@@ -10,24 +10,22 @@ import EmployeeTable from "@/components/employee-table";
 import { Link } from "wouter";
 import PageHeader from "@/components/page-header";
 import Breadcrumb from "@/components/breadcrumb";
+import { authenticatedApiRequest } from "@/lib/auth";
+import { useAuth } from "@/lib/auth";
 
 export default function Employees() {
   const [searchQuery, setSearchQuery] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-
-  
-  // For demo purposes, using a hardcoded company ID
-  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  const { user } = useAuth();
+  const companyId = user?.company?.id;
   
   const { data: employees, isLoading } = useQuery({
     queryKey: ['/api/companies', companyId, 'employees', searchQuery],
     queryFn: async () => {
+      if (!companyId) throw new Error("Company ID is required");
       const searchParam = searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : '';
-      const response = await fetch(`/api/companies/${companyId}/employees${searchParam}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch employees');
-      }
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/employees${searchParam}`);
       return response.json();
     },
     enabled: !!companyId,

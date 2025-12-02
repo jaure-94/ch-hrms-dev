@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,11 +12,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { DatePicker } from "@/components/ui/date-picker";
 import { 
-  jobTitles, 
-  departments, 
   employmentStatuses, 
   payFrequency, 
   paymentMethods, 
@@ -29,6 +28,13 @@ import {
 
 const formSchema = z.object({
   // Personal Information
+  employeeId: z.preprocess(
+    (val) => (val === "" || val === null ? undefined : val),
+    z.string()
+      .max(50, "Employee ID too long")
+      .regex(/^[A-Za-z0-9-_]*$/, "Only letters, numbers, hyphens, underscores allowed")
+      .optional()
+  ),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Invalid email address"),
@@ -69,6 +75,7 @@ const formSchema = z.object({
   
   // Company
   companyId: z.string().min(1, "Company is required"),
+  jobRoleId: z.string().uuid("Invalid job role ID").optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -83,11 +90,71 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
   const [selectedBenefits, setSelectedBenefits] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const companyId = user?.company?.id;
+
+  // Fetch departments for the company
+  const { data: departmentsData, isLoading: departmentsLoading } = useQuery({
+    queryKey: [`/api/companies/${companyId}/departments`],
+    queryFn: async () => {
+      if (!companyId) throw new Error("Company ID is required");
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/departments`);
+      return response.json();
+    },
+    enabled: currentStep >= 3 && !!companyId && isAuthenticated && !authLoading, // Wait for auth to complete
+  });
+
+  // Fetch vacant job roles for the company
+  const { data: jobRolesData, isLoading: jobRolesLoading, error: jobRolesError } = useQuery({
+    queryKey: [`/api/companies/${companyId}/job-roles`, { status: 'vacant' }],
+    queryFn: async () => {
+      if (!companyId) throw new Error("Company ID is required");
+      if (!isAuthenticated) throw new Error("Not authenticated");
+      
+      console.log(`[OnboardingForm] Fetching job roles for company: ${companyId}`);
+      console.log(`[OnboardingForm] Auth state - isAuthenticated: ${isAuthenticated}, authLoading: ${authLoading}`);
+      
+      try {
+        // Add a small delay to ensure token is set after auth completes
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/job-roles?status=vacant`);
+        
+        // Check if response is HTML (error page) instead of JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error(`[OnboardingForm] Received non-JSON response (${contentType}):`, text.substring(0, 200));
+          throw new Error(`Server returned ${contentType} instead of JSON. Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`[OnboardingForm] Received ${data?.length || 0} job roles:`, data);
+        return data;
+      } catch (error) {
+        console.error(`[OnboardingForm] Error fetching job roles:`, error);
+        // If it's a JSON parse error, it means we got HTML
+        if (error instanceof SyntaxError && error.message.includes('JSON')) {
+          throw new Error('Server returned an error page. Please check your authentication and try again.');
+        }
+        throw error;
+      }
+    },
+    enabled: currentStep >= 3 && !!companyId && isAuthenticated && !authLoading, // Wait for auth to complete
+    retry: (failureCount, error) => {
+      // Don't retry on 401 errors - it means auth failed
+      if (error instanceof Error && error.message.includes('401')) {
+        return false;
+      }
+      return failureCount < 1; // Retry once for other errors
+    },
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: "onChange", // This makes validation errors disappear immediately when valid input is entered
     defaultValues: {
+      employeeId: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -119,13 +186,30 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       maritalStatus: "",
       taxCode: "",
       visaCategory: "",
-      companyId: "68f11a7e-27ab-40eb-826e-3ce6d84874de", // In a real app, this would be selected
+      companyId: companyId || "",
+      jobRoleId: undefined,
     },
   });
 
+  // Auto-fill department and job title when job role is selected
+  const selectedJobRoleId = form.watch("jobRoleId");
+  useEffect(() => {
+    if (selectedJobRoleId && jobRolesData && Array.isArray(jobRolesData)) {
+      const selectedJobRole = jobRolesData.find((jr: any) => jr.id === selectedJobRoleId);
+      if (selectedJobRole) {
+        form.setValue("department", selectedJobRole.departmentName);
+        form.setValue("jobTitle", selectedJobRole.title);
+      }
+    } else if (!selectedJobRoleId) {
+      // Clear department and job title if no job role is selected
+      form.setValue("department", "");
+      form.setValue("jobTitle", "");
+    }
+  }, [selectedJobRoleId, jobRolesData, form]);
+
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await apiRequest('POST', '/api/employees', {
+      const response = await authenticatedApiRequest('POST', '/api/employees', {
         ...data,
         emergencyContact: {
           name: data.emergencyContactName,
@@ -142,9 +226,19 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
         description: "The new employee has been added to your organization. You can generate their contract from the Contracts page.",
       });
       
-      // Invalidate both companies and employees queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/companies', employeeData.companyId, 'employees'] });
+      // Invalidate all employee-related queries for this company
+      // This will refresh the employees list page regardless of search query
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/companies', employeeData.companyId, 'employees'],
+        exact: false, // Match all queries that start with this key (including search queries)
+      });
+      
+      // Also invalidate company stats and details
+      await queryClient.invalidateQueries({ 
+        queryKey: ['/api/companies', employeeData.companyId],
+        exact: false,
+      });
+      
       onStepChange(totalSteps + 1); // Move to success step
     },
     onError: (error: any) => {
@@ -176,11 +270,11 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
   const getCurrentStepFields = (): (keyof FormData)[] => {
     switch (currentStep) {
       case 1:
-        return ['firstName', 'lastName', 'email', 'phoneNumber', 'nationalInsuranceNumber', 'gender', 'maritalStatus', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship', 'address', 'dateOfBirth'];
+        return ['employeeId', 'firstName', 'lastName', 'email', 'phoneNumber', 'nationalInsuranceNumber', 'gender', 'maritalStatus', 'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship', 'address', 'dateOfBirth'];
       case 2:
         return ['passportNumber', 'visaCategory']; // VISA Information - optional fields
       case 3:
-        return ['jobTitle', 'department', 'employmentStatus', 'baseSalary', 'payFrequency', 'startDate', 'location', 'weeklyHours', 'manager', 'paymentMethod', 'taxCode'];
+        return ['jobRoleId', 'jobTitle', 'department', 'employmentStatus', 'baseSalary', 'payFrequency', 'startDate', 'location', 'weeklyHours', 'manager', 'paymentMethod', 'taxCode'];
       case 4:
         return []; // Review step, no specific fields to validate
       default:
@@ -216,6 +310,23 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
       {currentStep === 1 && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <Label htmlFor="employeeId">Employee ID</Label>
+              <Input
+                id="employeeId"
+                {...form.register("employeeId")}
+                placeholder="EMP001"
+              />
+              {form.formState.errors.employeeId && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.employeeId.message}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Optional: Unique identifier to match with job roles
+              </p>
+            </div>
+            
             <div>
               <Label htmlFor="firstName">First Name *</Label>
               <Input
@@ -497,25 +608,70 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <Label htmlFor="jobTitle">Job Title *</Label>
+              <Label htmlFor="jobRoleId">Job Role *</Label>
               <Select
-                value={form.watch("jobTitle")}
-                onValueChange={(value) => form.setValue("jobTitle", value)}
+                value={form.watch("jobRoleId") || ""}
+                onValueChange={(value) => {
+                  if (value === "no-roles" || value === "loading" || value === "error") return; // Prevent selecting disabled options
+                  if (value === "") {
+                    // Clear job role selection
+                    form.setValue("jobRoleId", undefined);
+                    form.setValue("department", "");
+                    form.setValue("jobTitle", "");
+                  } else {
+                    form.setValue("jobRoleId", value);
+                    // Department and job title will be auto-filled via useEffect
+                  }
+                }}
+                disabled={jobRolesLoading}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Job Title" />
+                <SelectTrigger className={jobRolesLoading ? "opacity-50" : ""}>
+                  <SelectValue placeholder={jobRolesLoading ? "Loading job roles..." : "Select Job Role"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobTitles.map((title) => (
-                    <SelectItem key={title} value={title}>{title}</SelectItem>
-                  ))}
+                  {jobRolesLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Loading job roles...
+                    </SelectItem>
+                  ) : jobRolesError ? (
+                    <SelectItem value="error" disabled>
+                      Error loading job roles
+                    </SelectItem>
+                  ) : !isAuthenticated || authLoading ? (
+                    <SelectItem value="auth-loading" disabled>
+                      Authenticating...
+                    </SelectItem>
+                  ) : jobRolesData && Array.isArray(jobRolesData) && jobRolesData.length > 0 ? (
+                    jobRolesData.map((jobRole: any) => (
+                      <SelectItem key={jobRole.id} value={jobRole.id}>
+                        {jobRole.title} - {jobRole.departmentName} ({jobRole.jobId})
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-roles" disabled>
+                      No vacant job roles available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
-              {form.formState.errors.jobTitle && (
+              {form.formState.errors.jobRoleId && (
                 <p className="text-sm text-red-600 mt-1">
-                  {form.formState.errors.jobTitle.message}
+                  {form.formState.errors.jobRoleId.message}
                 </p>
               )}
+              {jobRolesError && (
+                <p className="text-sm text-red-600 mt-1">
+                  Failed to load job roles: {jobRolesError instanceof Error ? jobRolesError.message : "Unknown error"}. Please refresh the page.
+                </p>
+              )}
+              {!isAuthenticated && !authLoading && (
+                <p className="text-sm text-yellow-600 mt-1">
+                  Please log in to view job roles.
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Selecting a job role will automatically fill the department and job title
+              </p>
             </div>
             
             <div>
@@ -523,19 +679,52 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
               <Select
                 value={form.watch("department")}
                 onValueChange={(value) => form.setValue("department", value)}
+                disabled={!!form.watch("jobRoleId")} // Disable when job role is selected
               >
-                <SelectTrigger>
+                <SelectTrigger className={form.watch("jobRoleId") ? "bg-gray-100" : ""}>
                   <SelectValue placeholder="Select Department" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
+                  {departmentsData && departmentsData.length > 0 ? (
+                    departmentsData.map((dept: any) => (
+                      <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="no-departments" disabled>
+                      No departments available
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               {form.formState.errors.department && (
                 <p className="text-sm text-red-600 mt-1">
                   {form.formState.errors.department.message}
+                </p>
+              )}
+              {form.watch("jobRoleId") && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Department is auto-filled from selected job role
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <Label htmlFor="jobTitle">Job Title *</Label>
+              <Input
+                id="jobTitle"
+                {...form.register("jobTitle")}
+                placeholder="Software Engineer"
+                disabled={!!form.watch("jobRoleId")} // Disable when job role is selected
+                className={form.watch("jobRoleId") ? "bg-gray-100" : ""}
+              />
+              {form.formState.errors.jobTitle && (
+                <p className="text-sm text-red-600 mt-1">
+                  {form.formState.errors.jobTitle.message}
+                </p>
+              )}
+              {form.watch("jobRoleId") && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Job title is auto-filled from selected job role
                 </p>
               )}
             </div>
@@ -751,6 +940,12 @@ export default function OnboardingForm({ currentStep, onStepChange, totalSteps }
             <div className="mb-6">
               <h4 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">Personal Information</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                {form.watch("employeeId") && (
+                  <div>
+                    <p className="font-medium text-gray-900">Employee ID</p>
+                    <p className="text-gray-600">{form.watch("employeeId")}</p>
+                  </div>
+                )}
                 <div>
                   <p className="font-medium text-gray-900">Full Name</p>
                   <p className="text-gray-600">{form.watch("firstName")} {form.watch("lastName")}</p>

@@ -29,7 +29,20 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    // Validate queryKey to prevent invalid requests
+    const url = queryKey[0] as string;
+    
+    if (!url || typeof url !== 'string' || url.trim() === '' || url === '/') {
+      console.warn('Invalid queryKey detected:', queryKey, 'Skipping fetch request.');
+      throw new Error(`Invalid queryKey: queryKey[0] must be a valid API endpoint path, got "${url}"`);
+    }
+
+    // Ensure the URL starts with /api to prevent fetching from root
+    if (!url.startsWith('/api/')) {
+      console.warn('Query URL does not start with /api/:', url, 'This may cause unexpected behavior.');
+    }
+
+    const res = await fetch(url, {
       credentials: "include",
     });
 

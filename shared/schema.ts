@@ -86,6 +86,7 @@ export const refreshTokens = pgTable("refresh_tokens", {
 export const employees = pgTable("employees", {
   id: uuid("id").primaryKey().defaultRandom(),
   companyId: uuid("company_id").references(() => companies.id).notNull(),
+  employeeId: text("employee_id").unique(), // Human-readable employee identifier for matching with job roles
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
