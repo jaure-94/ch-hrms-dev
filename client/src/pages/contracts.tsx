@@ -14,6 +14,7 @@ import Breadcrumb from "@/components/breadcrumb";
 import ContractViewModal from "@/components/contract-view-modal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 
 export default function Contracts() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,18 +24,30 @@ export default function Contracts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
-  // For demo purposes, using a hardcoded company ID
-  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  // Get company ID from authenticated user, fallback to hardcoded for demo
+  const companyId = user?.company?.id || "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
   const { data: contracts, isLoading } = useQuery({
     queryKey: [`/api/companies/${companyId}/contracts`],
+    queryFn: async () => {
+      try {
+        const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/contracts`);
+        const data = await response.json();
+        console.log('[Contracts] Loaded contracts:', data?.length || 0, 'contracts');
+        return data;
+      } catch (error) {
+        console.error('[Contracts] Error loading contracts:', error);
+        throw error;
+      }
+    },
     enabled: !!companyId,
   });
 
   const deleteContractMutation = useMutation({
     mutationFn: async (contractId: string) => {
-      await apiRequest('DELETE', `/api/contracts/${contractId}`);
+      await authenticatedApiRequest('DELETE', `/api/contracts/${contractId}`);
     },
     onSuccess: () => {
       toast({
@@ -75,7 +88,7 @@ export default function Contracts() {
 
   const handleDownloadContract = async (contractId: string) => {
     try {
-      const response = await fetch(`/api/contracts/${contractId}/download`);
+      const response = await authenticatedApiRequest('GET', `/api/contracts/${contractId}/download`);
       
       if (response.ok) {
         const blob = await response.blob();
@@ -94,9 +107,19 @@ export default function Contracts() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+        
+        toast({
+          title: "Download started",
+          description: `Downloading ${filename}...`,
+        });
       }
     } catch (error) {
       console.error('Failed to download contract:', error);
+      toast({
+        title: "Download failed",
+        description: error instanceof Error ? error.message : "Failed to download the contract. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

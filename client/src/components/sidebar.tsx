@@ -8,7 +8,7 @@ import chLogoPlain from "@assets/ch-logo-plain_1751733209226.png";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/lib/auth";
+import { useAuth, authenticatedApiRequest } from "@/lib/auth";
 
 interface SidebarProps {
   selectedCompanyId: string;
@@ -21,19 +21,42 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   
+  // Use user's company ID directly (same as employees page)
+  const companyId = user?.company?.id;
+  
   const { data: companies } = useQuery({
     queryKey: ['/api/companies'],
     staleTime: 1000 * 60 * 5, // 5 minutes
+    queryFn: async () => {
+      const res = await authenticatedApiRequest('GET', '/api/companies');
+      return res.json();
+    },
   });
 
   const { data: selectedCompany } = useQuery({
-    queryKey: ['/api/companies', selectedCompanyId],
-    enabled: !!selectedCompanyId,
+    queryKey: [`/api/companies/${companyId}`],
+    enabled: !!companyId,
+    staleTime: 1000 * 60, // refresh company details at least every minute
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      const res = await authenticatedApiRequest('GET', `/api/companies/${companyId}`);
+      return res.json();
+    },
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ['/api/companies', selectedCompanyId, 'stats'],
-    enabled: !!selectedCompanyId,
+  // Fetch employees directly (same endpoint and pattern as employees page) to get accurate count
+  const { data: employees, isLoading: isLoadingEmployees, error: employeesError } = useQuery({
+    queryKey: [`/api/companies/${companyId}/employees`],
+    enabled: !!companyId,
+    staleTime: 1000 * 30, // 30 seconds
+    refetchOnWindowFocus: true,
+    queryFn: async () => {
+      if (!companyId) throw new Error("Company ID is required");
+      const res = await authenticatedApiRequest('GET', `/api/companies/${companyId}/employees`);
+      const data = await res.json();
+      console.log('[Sidebar] Employees fetched:', data?.length || 0, 'employees');
+      return data;
+    },
   });
 
   const navigationItems = [
@@ -82,6 +105,25 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
     }
   };
 
+  const companyName =
+    (selectedCompany as any)?.name || user?.company?.name || "Company";
+  
+  // Get employee count from the employees array (same data source as employees page)
+  const employeeCount = Array.isArray(employees) ? employees.length : 0;
+  
+  // Debug logging
+  if (import.meta.env.DEV) {
+    console.log('[Sidebar] Company ID:', companyId);
+    console.log('[Sidebar] Employees data:', employees);
+    console.log('[Sidebar] Employee count:', employeeCount);
+    console.log('[Sidebar] Is loading:', isLoadingEmployees);
+    console.log('[Sidebar] Error:', employeesError);
+  }
+  
+  const formattedEmployeeCount = isLoadingEmployees 
+    ? "Loading..." 
+    : `${employeeCount} employee${employeeCount === 1 ? "" : "s"}`;
+
   return (
     <div className={`${isCollapsed ? 'w-16' : 'w-64'} bg-white shadow-lg border-r border-gray-200 flex flex-col transition-all duration-300 ease-in-out fixed left-0 top-0 h-screen z-50`}>
       {/* Toggle Button */}
@@ -105,18 +147,18 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
         <div className="p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white">
-              <img 
-                src={chLogoPlain} 
-                alt="Compliance Hub UK" 
+              <img
+                src={chLogoPlain}
+                alt={`${companyName} logo`}
                 className="w-8 h-8 object-contain"
               />
             </div>
             <div>
               <h2 className="font-semibold text-gray-900">
-                Compliance Hub UK
+                {companyName}
               </h2>
               <p className="text-sm text-gray-500">
-                {(stats as any)?.totalEmployees || 0} employees
+                {formattedEmployeeCount}
               </p>
             </div>
           </div>
@@ -140,9 +182,9 @@ export default function Sidebar({ selectedCompanyId, onCompanySelect, isCollapse
       {isCollapsed && (
         <div className="p-4 border-b border-gray-200 flex justify-center">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white">
-            <img 
-              src={chLogoPlain} 
-              alt="Compliance Hub UK" 
+            <img
+              src={chLogoPlain}
+              alt={`${companyName} logo`}
               className="w-6 h-6 object-contain"
             />
           </div>

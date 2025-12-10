@@ -50,6 +50,17 @@ export default function Company() {
   // Fetch company statistics
   const { data: stats } = useQuery({
     queryKey: ['/api/companies', companyId, 'stats'],
+    queryFn: async () => {
+      try {
+        const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/stats`);
+        const data = await response.json();
+        console.log('[Company] Stats loaded:', data);
+        return data;
+      } catch (error) {
+        console.error('[Company] Error loading stats:', error);
+        throw error;
+      }
+    },
     enabled: !!companyId,
   });
 

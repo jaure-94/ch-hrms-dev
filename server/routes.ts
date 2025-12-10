@@ -2926,27 +2926,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, fileName, fileContent, fileSize, description, uploadedBy } = req.body;
       
-      if (!name || !fileName || !fileContent || !fileSize || !uploadedBy) {
-        return res.status(400).json({ message: "Missing required fields" });
+      console.log("=== CONTRACT TEMPLATE CREATION REQUEST ===");
+      console.log("Company ID:", req.params.companyId);
+      console.log("Name:", name);
+      console.log("FileName:", fileName);
+      console.log("FileSize:", fileSize, "Type:", typeof fileSize);
+      console.log("FileContent length:", fileContent?.length || 0);
+      console.log("Description:", description);
+      console.log("UploadedBy:", uploadedBy);
+      
+      if (!name || !fileName || !fileContent || fileSize === undefined || fileSize === null || !uploadedBy) {
+        console.error("=== MISSING REQUIRED FIELDS ===");
+        return res.status(400).json({ 
+          message: "Missing required fields",
+          received: { name: !!name, fileName: !!fileName, fileContent: !!fileContent, fileSize: fileSize !== undefined && fileSize !== null, uploadedBy: !!uploadedBy }
+        });
+      }
+
+      // Ensure fileSize is an integer
+      const fileSizeInt = parseInt(String(fileSize), 10);
+      if (isNaN(fileSizeInt)) {
+        console.error("=== INVALID FILE SIZE ===");
+        return res.status(400).json({ message: "Invalid file size" });
       }
 
       // First, deactivate all existing templates for this company
       await db.update(contractTemplates).set({ isActive: false }).where(eq(contractTemplates.companyId, req.params.companyId));
 
+      console.log("=== CREATING TEMPLATE ===");
       const template = await storage.createContractTemplate({
         companyId: req.params.companyId,
         name,
         fileName,
         fileContent,
-        fileSize,
-        description,
+        fileSize: fileSizeInt,
+        description: description || null,
         uploadedBy,
         isActive: true, // New template becomes active by default
       });
 
+      console.log("=== TEMPLATE CREATED SUCCESSFULLY ===");
       res.status(201).json(template);
     } catch (error) {
-      console.error("Error creating contract template:", error);
+      console.error("=== ERROR CREATING CONTRACT TEMPLATE ===");
+      console.error("Error:", error);
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      }
       const errorMessage = error instanceof Error ? error.message : String(error);
       res.status(500).json({ message: "Failed to create contract template", error: errorMessage });
     }
@@ -2984,14 +3011,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/companies/:companyId/stats", authenticateToken, async (req: AuthenticatedRequest, res) => {
     try {
       const employees = await storage.getEmployeesByCompany(req.params.companyId);
+      
+      // Count active users for this company
+      const activeUsers = await db
+        .select({ count: count() })
+        .from(users)
+        .where(
+          and(
+            eq(users.companyId, req.params.companyId),
+            eq(users.isActive, true)
+          )
+        );
+      
+      const activeUsersCount = activeUsers[0]?.count || 0;
+      
       const stats = {
         totalEmployees: employees.length,
         activeContracts: employees.filter(e => e.employment.status === 'active').length,
         pendingOnboarding: employees.filter(e => e.employment.status === 'pending').length,
+        activeUsers: activeUsersCount,
         contractRenewals: 0, // This would need additional logic based on contract end dates
       };
       res.json(stats);
     } catch (error) {
+      console.error("Error fetching company stats:", error);
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });

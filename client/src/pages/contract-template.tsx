@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
+import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 
 interface ContractTemplate {
   id: string;
@@ -43,13 +44,19 @@ export default function ContractTemplatePage() {
   const [dragOver, setDragOver] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
-  // For demo purposes, using a hardcoded company ID
-  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  // Get company ID from authenticated user, fallback to hardcoded for demo
+  const companyId = user?.company?.id || "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  const uploadedBy = user ? `${user.firstName} ${user.lastName}`.trim() : 'Unknown User';
 
   // Load templates from database
   const { data: templates, isLoading: templatesLoading } = useQuery({
     queryKey: [`/api/companies/${companyId}/contract-templates`],
+    queryFn: async () => {
+      const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/contract-templates`);
+      return response.json();
+    },
     enabled: !!companyId,
   });
 
@@ -66,17 +73,13 @@ export default function ContractTemplatePage() {
             for (const template of parsedTemplates) {
               if (template.fileContent) {
                 try {
-                  await fetch(`/api/companies/${companyId}/contract-templates`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      name: template.name,
-                      fileName: template.fileName,
-                      fileContent: template.fileContent,
-                      fileSize: template.fileSize ? parseInt(template.fileSize) : 0,
-                      description: template.description || '',
-                      uploadedBy: template.uploadedBy || 'System Migration',
-                    }),
+                  await authenticatedApiRequest('POST', `/api/companies/${companyId}/contract-templates`, {
+                    name: template.name,
+                    fileName: template.fileName,
+                    fileContent: template.fileContent,
+                    fileSize: template.fileSize ? parseInt(template.fileSize) : 0,
+                    description: template.description || '',
+                    uploadedBy: template.uploadedBy || 'System Migration',
                   });
                 } catch (error) {
                   console.error('Failed to migrate template:', template.name, error);
@@ -129,24 +132,14 @@ export default function ContractTemplatePage() {
         reader.readAsDataURL(file);
       });
       
-      const response = await fetch(`/api/companies/${companyId}/contract-templates`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          fileName: file.name,
-          fileContent: base64,
-          fileSize: file.size,
-          description: description || '',
-          uploadedBy: 'Leo Kaluza',
-        }),
+      const response = await authenticatedApiRequest('POST', `/api/companies/${companyId}/contract-templates`, {
+        name,
+        fileName: file.name,
+        fileContent: base64,
+        fileSize: file.size,
+        description: description || null,
+        uploadedBy: uploadedBy,
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload template');
-      }
 
       return response.json();
     },
@@ -162,10 +155,12 @@ export default function ContractTemplatePage() {
       // Refetch templates
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contract-templates`] });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Upload error:", error);
+      const errorMessage = error?.message || "Failed to upload the contract template. Please try again.";
       toast({
         title: "Upload failed",
-        description: "Failed to upload the contract template. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -391,13 +386,7 @@ export default function ContractTemplatePage() {
 
   const handleSetActive = async (templateId: string) => {
     try {
-      const response = await fetch(`/api/contract-templates/${templateId}/activate`, {
-        method: 'PUT',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to activate template');
-      }
+      await authenticatedApiRequest('PUT', `/api/contract-templates/${templateId}/activate`);
 
       toast({
         title: "Template activated",

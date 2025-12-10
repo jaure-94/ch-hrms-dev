@@ -29,6 +29,7 @@ import { Link, useLocation } from "wouter";
 import Breadcrumb from "@/components/breadcrumb";
 import PageHeader from "@/components/page-header";
 import { DatePicker } from "@/components/ui/date-picker";
+import { authenticatedApiRequest, useAuth } from "@/lib/auth";
 
 const contractFormSchema = z.object({
   employeeId: z.string().min(1, "Please select an employee"),
@@ -56,19 +57,54 @@ export default function ContractGeneratePage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTemplate, setActiveTemplate] = useState<any>(null);
+  const { user } = useAuth();
   
-  // For demo purposes, using a hardcoded company ID
-  const companyId = "68f11a7e-27ab-40eb-826e-3ce6d84874de";
+  // Get company ID from authenticated user, fallback to hardcoded for demo
+  const companyId = user?.company?.id || "68f11a7e-27ab-40eb-826e-3ce6d84874de";
   
   const { data: employees, isLoading: employeesLoading, error: employeesError } = useQuery({
     queryKey: [`/api/companies/${companyId}/employees`],
+    queryFn: async () => {
+      try {
+        const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/employees`);
+        const data = await response.json();
+        console.log('[Contract Generate] Employees loaded:', data?.length || 0, 'employees');
+        return data;
+      } catch (error) {
+        console.error('[Contract Generate] Error loading employees:', error);
+        throw error;
+      }
+    },
     enabled: !!companyId,
   });
 
   // Load active template from database
-  const { data: activeTemplateData, isLoading: templateLoading } = useQuery({
+  const { data: activeTemplateData, isLoading: templateLoading, error: templateError } = useQuery({
     queryKey: [`/api/companies/${companyId}/contract-templates/active`],
+    queryFn: async () => {
+      try {
+        const response = await authenticatedApiRequest('GET', `/api/companies/${companyId}/contract-templates/active`);
+        const data = await response.json();
+        console.log('[Contract Generate] Active template loaded:', data?.name || 'Unknown');
+        return data;
+      } catch (error) {
+        console.error('[Contract Generate] Error loading active template:', error);
+        // If it's a 404, return null (no template found - this is not an error state)
+        if (error instanceof Error && (error.message.startsWith('404:') || error.message.includes('404'))) {
+          console.log('[Contract Generate] No active template found (404)');
+          return null;
+        }
+        throw error;
+      }
+    },
     enabled: !!companyId,
+    retry: (failureCount, error) => {
+      // Don't retry on 404 errors
+      if (error instanceof Error && (error.message.startsWith('404:') || error.message.includes('404'))) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   // Update activeTemplate state when data changes
@@ -150,35 +186,33 @@ export default function ContractGeneratePage() {
         throw new Error('No active contract template found. Please upload and activate a template first.');
       }
       
-      const response = await fetch(`/api/employees/${data.employeeId}/contract`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          templateId: activeTemplate.id,
-          templateContent: activeTemplate.fileContent,
-          templateName: activeTemplate.name,
-          noticeWeeks: data.noticeWeeks ? parseInt(data.noticeWeeks) : null,
-          contractDate: data.contractDate || null,
-          probationPeriod: data.probationPeriod || null,
-        }),
+      const response = await authenticatedApiRequest('POST', `/api/employees/${data.employeeId}/contract`, {
+        templateId: activeTemplate.id,
+        templateContent: activeTemplate.fileContent,
+        templateName: activeTemplate.name,
+        noticeWeeks: data.noticeWeeks ? parseInt(data.noticeWeeks) : null,
+        contractDate: data.contractDate || null,
+        probationPeriod: data.probationPeriod || null,
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate contract');
-      }
       
       // Return the JSON response (no longer auto-downloading)
       return await response.json();
     },
     onSuccess: (result) => {
+      console.log('[Contract Generate] Contract generated successfully:', result);
       toast({
         title: "Contract generated successfully",
         description: "The employment contract has been generated and is ready for download.",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/contracts`] });
+      // Invalidate and refetch contracts list
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/companies/${companyId}/contracts`],
+        exact: false,
+      });
+      // Also refetch to ensure the list updates immediately
+      queryClient.refetchQueries({ 
+        queryKey: [`/api/companies/${companyId}/contracts`],
+      });
       setLocation("/contracts");
     },
     onError: (error: any) => {
@@ -194,7 +228,7 @@ export default function ContractGeneratePage() {
     generateContractMutation.mutate(data);
   };
 
-  if (employeesLoading) {
+  if (employeesLoading || templateLoading) {
     return (
       <div className="flex-1 p-6">
         <div className="animate-pulse">
@@ -227,11 +261,18 @@ export default function ContractGeneratePage() {
       {/* Main Content */}
       <main className="flex-1 p-6">
         {/* Template Status Alert */}
-        {activeTemplate ? (
+        {templateError && !(templateError instanceof Error && templateError.message.includes('404')) ? (
+          <Alert className="mb-6" variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Error loading contract template: {templateError instanceof Error ? templateError.message : 'Unknown error'}
+            </AlertDescription>
+          </Alert>
+        ) : activeTemplate ? (
           <Alert className="mb-6">
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Using active template: <strong>{activeTemplate.name}</strong> (v{activeTemplate.version})
+              Using active template: <strong>{activeTemplate.name}</strong> (v{activeTemplate.version || 1})
             </AlertDescription>
           </Alert>
         ) : (
@@ -267,11 +308,25 @@ export default function ContractGeneratePage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {employees?.map((employee: any) => (
-                              <SelectItem key={employee.id} value={employee.id}>
-                                {employee.firstName} {employee.lastName} - {employee.employment?.jobTitle || 'No Title'}
+                            {employeesError ? (
+                              <SelectItem value="error" disabled>
+                                Error loading employees
                               </SelectItem>
-                            ))}
+                            ) : employeesLoading ? (
+                              <SelectItem value="loading" disabled>
+                                Loading employees...
+                              </SelectItem>
+                            ) : !employees || employees.length === 0 ? (
+                              <SelectItem value="empty" disabled>
+                                No employees found
+                              </SelectItem>
+                            ) : (
+                              employees.map((employee: any) => (
+                                <SelectItem key={employee.id} value={employee.id}>
+                                  {employee.firstName} {employee.lastName} - {employee.employment?.jobTitle || 'No Title'}
+                                </SelectItem>
+                              ))
+                            )}
                           </SelectContent>
                         </Select>
                         <FormDescription>
